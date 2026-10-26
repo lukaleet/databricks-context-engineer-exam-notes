@@ -7,9 +7,9 @@ questions:
       prompt is "Summarize the key findings so far." Which revision fixes the root cause without much extra cost?
     options:
       - 'Summarize key findings and include a deduplicated list of the user''s constraints, exclusions and preferences'
-      - 'Summarize key findings and append every user message verbatim'
-      - 'Summarize key findings and include the outputs of all tool calls'
-      - 'Summarize key findings and include the agent''s chain-of-thought for each step'
+      - 'Summarize key findings and include the outputs of all tool calls made during the session'
+      - 'Summarize key findings and append a structured log of every user message from prior turns, preserving the original wording'
+      - 'Summarize key findings and include a record of the agent''s reasoning from each prior step'
     answer: [A]
     explain: >-
       The lost category is user constraints. Adding it compactly fixes the failure. Verbatim messages, all tool outputs or reasoning
@@ -21,13 +21,15 @@ questions:
       After compaction, a data-migration agent re-runs table copies it had already completed, wasting hours. Which category did the
       compaction lose?
     options:
-      - 'Task progress: which steps were completed and their outcomes'
-      - 'The user''s tone preferences'
-      - 'Raw tool outputs'
-      - 'Pleasantries'
-    answer: [A]
+      - 'User constraints: which tables the user said must never be modified'
+      - 'Identifiers: the exact names of the source and target tables in the plan'
+      - 'Task progress: which steps were completed and what their outcomes were'
+      - 'Raw tool outputs: the row counts returned by each completed copy job'
+    answer: [C]
     explain: >-
-      Redoing completed work means progress state was dropped. Add "completed steps and outcomes" (or keep progress in a state table).
+      Redoing completed work means progress state was dropped. Add "completed steps and their outcomes" to the compaction prompt (or
+      keep progress in a state table). Lost constraints would show as rule violations, and lost identifiers as wrong or invented ids,
+      not repeated work.
 
   - id: d6-03
     objective: Identify which category of information was incorrectly discarded during compaction and select the revision that preserves it without significantly increasing token cost
@@ -35,11 +37,11 @@ questions:
       After compaction, an agent calls tools with ticket ids that don't exist, although the summary mentions "several tickets were
       opened". What revision fixes this cheaply?
     options:
-      - 'Instruct the summary to preserve identifiers (ids, paths, names) exactly'
-      - 'Include all tool outputs verbatim in the summary'
-      - 'Disable compaction'
-      - 'Increase the model temperature'
-    answer: [A]
+      - 'Disable compaction for this agent and rely on a sliding window of recent turns'
+      - 'Instruct the summary to keep identifiers (ids, paths, names) exactly'
+      - 'Add a rule that the agent must list all tickets again before acting on any of them'
+      - 'Include the outputs of all ticket-related tool calls verbatim in the summary'
+    answer: [B]
     explain: >-
       Identifiers were paraphrased away. Preserving them exactly costs a few tokens.
 
@@ -49,11 +51,11 @@ questions:
       After compaction, an agent keeps retrying an API approach that already failed twice earlier in the session (authentication
       requires a different endpoint). What should the compaction prompt add?
     options:
-      - 'A short record of failed approaches and why they failed'
-      - 'The full stack traces of every error'
-      - 'All previous messages'
-      - 'Nothing: retries are normal'
-    answer: [A]
+      - 'All previous messages from the turns where errors occurred'
+      - 'A list of every API endpoint the agent called, in order'
+      - 'The full stack trace of every error raised in the session'
+      - 'A short record of each failed approach and why it failed'
+    answer: [D]
     explain: >-
       Negative results prevent repeating dead ends. A one-line lesson is enough; full stack traces are expensive.
 
@@ -62,10 +64,10 @@ questions:
     q: >-
       What is the recommended order for tuning a compaction prompt?
     options:
-      - 'First maximize recall so nothing needed later is lost, then iteratively remove superfluous content to improve precision'
-      - 'First make the summary as short as possible, then add back what breaks'
-      - 'Tune only for the smallest token count'
-      - 'Tune only on synthetic short conversations'
+      - 'Maximize recall first, then remove superfluous content to improve precision'
+      - 'Tune recall and precision together in one pass, scoring each prompt by summary length per success'
+      - 'First make the summary as short as possible, then add back each category whose loss breaks the task'
+      - 'First maximize precision on short synthetic traces, then check recall on long production traces'
     answer: [A]
     explain: >-
       Missing information fails silently later; extra tokens are a visible, cheap problem. Capture everything first, then trim.
@@ -75,13 +77,15 @@ questions:
     q: >-
       How should a team check that a precision-tuned compaction prompt hasn't removed something important?
     options:
-      - 'Run compaction on real long traces, let the agent continue, and evaluate downstream task success (e.g. with MLflow), comparing against the recall-first version'
-      - 'Check that the summary is shorter than before'
-      - 'Ask the model whether it forgot anything'
-      - 'Read one summary manually'
-    answer: [A]
+      - 'Have a reviewer read one compacted summary next to its original trace and confirm that the key facts are present'
+      - 'Check that the new summaries are shorter than the recall-first ones while still mentioning every category in the prompt'
+      - 'Compact real long traces, let the agent continue, and evaluate downstream task success in MLflow'
+      - 'Ask the model, after each compaction, whether anything important was left out of the summary, and log its answer'
+    answer: [C]
     explain: >-
-      The test of a summary is whether the agent still completes the task correctly after it. Measure that across many traces.
+      The test of a summary is whether the agent still completes the task correctly after it, measured across many real traces. Summary
+      length or category coverage is a proxy, the model can't reliably report what it forgot, and one manual review doesn't catch rare
+      losses.
 
   - id: d6-07
     objective: Evaluate whether hard-coded trimming heuristics are sufficient or a more sophisticated compaction approach is needed
@@ -89,11 +93,11 @@ questions:
       A help-desk chat handles a series of unrelated short questions per session ("reset password", then "printer offline"...).
       Context pressure builds in long sessions. Is a sliding window sufficient?
     options:
+      - 'No: the agent needs every earlier question to answer the next one, so nothing can be dropped'
+      - 'No: only LLM compaction preserves the session, so summaries are needed even for short questions'
+      - 'Yes, but only if the agent also moves to a model with a larger context window'
       - 'Yes: relevance is recency-local, so dropping old, finished exchanges is cheap and safe'
-      - 'No: only LLM compaction is ever acceptable'
-      - 'No: the agent needs every past question to answer the next one'
-      - 'Yes, but only with a larger model'
-    answer: [A]
+    answer: [D]
     explain: >-
       When old turns are finished business, trimming is enough and cheaper than summarization.
 
@@ -103,11 +107,11 @@ questions:
       A research agent's user stated in turn 2: "Ignore studies before 2020 and anything funded by vendors." The team keeps only the
       last 30 messages. After turn 60 the agent cites a 2017 vendor-funded study. What should change?
     options:
-      - 'Replace the sliding window with compaction (or notes) that preserves the user''s constraints'
-      - 'Keep the last 60 messages instead of 30'
-      - 'Add the constraint to the tool descriptions'
-      - 'Switch to a model with a larger context window'
-    answer: [A]
+      - 'Keep the last 60 messages instead of 30, so the constraint stays in the window longer'
+      - 'Add the constraint to the search tool''s description so every search applies it'
+      - 'Move to a model with a larger context window so no messages need to be dropped'
+      - 'Replace the sliding window with compaction that keeps the user''s stated constraints'
+    answer: [D]
     explain: >-
       Early constraints stay relevant throughout, so recency-based trimming is insufficient. A larger trim window only delays the
       failure.
@@ -117,12 +121,12 @@ questions:
     q: >-
       Which TWO items are safe to remove when compacting a long agent trace?
     options:
-      - 'Raw tool outputs whose findings are already recorded in later messages'
-      - 'Acknowledgements and small talk ("thanks!", "sure, happy to help")'
       - 'The user''s budget limit'
       - 'The id of the record the agent created'
+      - 'Acknowledgements and small talk ("thanks!", "sure, happy to help")'
+      - 'Raw tool outputs whose findings are already recorded in later messages'
       - 'The decision to drop vendor X and its reason'
-    answer: [A, B]
+    answer: [C, D]
     explain: >-
       Digested raw outputs and chatter don't affect later steps. Constraints, ids and decisions do.
 
@@ -131,11 +135,11 @@ questions:
     q: >-
       Why must compaction never cut between a tool call and its tool result?
     options:
-      - 'An orphaned call or result breaks the message structure many APIs expect and confuses the model about what happened'
-      - 'Tool results are always the most important content'
-      - 'Tool calls can''t be summarized'
-      - 'It doubles the token count'
-    answer: [A]
+      - 'Tool results are always the most important content in a trace, so they must never be summarized or removed'
+      - 'Splitting a call from its result makes the framework re-run the call, doubling the tokens it uses'
+      - 'An orphaned call or result breaks the message structure APIs expect and confuses the model'
+      - 'Tool calls can''t be summarized by the compaction model, so they have to be carried over unchanged'
+    answer: [C]
     explain: >-
       Calls and results are a pair. Keep both (or summarize both) when cutting the history.
 
@@ -145,11 +149,11 @@ questions:
       A legal-review agent runs for hours; small details (an exception in clause 7, a client's preference for UK spelling) matter
       later. Which compaction posture fits?
     options:
-      - 'Conservative compaction: higher-fidelity summaries and a larger verbatim tail, accepting higher token cost'
-      - 'Aggressive compaction: summarize to 200 tokens every 5 turns'
-      - 'No compaction; just truncate at the limit'
-      - 'Aggressive compaction plus a bigger model'
-    answer: [A]
+      - 'Aggressive compaction combined with a larger model that can infer the details that were dropped'
+      - 'Aggressive compaction: summarize to about 200 tokens every 5 turns to keep the agent focused'
+      - 'Conservative compaction: high-fidelity summaries and a larger verbatim tail, at higher cost'
+      - 'No compaction: keep the full history and truncate only when the hard limit is reached'
+    answer: [C]
     explain: >-
       High-stakes tasks with subtle long-range details favour fidelity over cost.
 
@@ -159,9 +163,9 @@ questions:
       What is the main risk of aggressive compaction?
     options:
       - 'Losing subtle context (nuances, implicit decisions), with losses compounding over repeated compactions'
-      - 'Higher token cost per call'
-      - 'Exceeding the context window more often'
-      - 'Slower first response'
+      - 'Exceeding the context window more often, because short summaries leave the verbatim tail too long'
+      - 'Higher token cost per call, because summaries are regenerated much more often than they are used'
+      - 'Slower responses on every turn, because the compaction model runs before each answer is generated'
     answer: [A]
     explain: >-
       Aggressive compaction saves tokens but risks dropping details; the loss compounds each time a summary is summarized again.
@@ -171,13 +175,14 @@ questions:
     q: >-
       Which characteristic of a task most clearly signals that trimming heuristics are insufficient?
     options:
-      - 'Information stated early (goals, constraints, decisions) is needed to make correct decisions much later'
-      - 'Each user turn is short'
-      - 'The agent uses few tools'
-      - 'The model is fast'
-    answer: [A]
+      - 'The agent uses only a few tools, so most of the context consists of conversation turns'
+      - 'Each user turn is short, so many turns fit in the window before trimming starts to remove them'
+      - 'Information stated early (goals, constraints, decisions) is needed for correct decisions much later'
+      - 'The task runs for hours, so the total number of turns is larger than any trimming window'
+    answer: [C]
     explain: >-
-      Long-range dependencies are what trimming destroys.
+      Long-range dependencies are what trimming destroys. Short turns, few tools or a long running time don't matter by themselves; what
+      matters is whether old information is still needed later.
 
   - id: d6-14
     objective: Identify which category of information was incorrectly discarded during compaction and select the revision that preserves it without significantly increasing token cost
@@ -185,11 +190,11 @@ questions:
       After compaction, an assistant's answers switch from the user's requested formal German to casual English. Which category was
       lost?
     options:
+      - 'Task progress and completed steps'
+      - 'Failed approaches and why they failed'
       - 'User preferences about language and style'
-      - 'Tool outputs'
-      - 'Identifiers'
-      - 'Failed approaches'
-    answer: [A]
+      - 'Identifiers such as record ids and file paths'
+    answer: [C]
     explain: >-
       Stated preferences are a small, high-value category the summary must keep.
 
@@ -199,11 +204,11 @@ questions:
       A recall-first compaction prompt keeps every category and the full output of every tool call. Downstream success is 98%, but
       summaries are 12k tokens. What's the next step?
     options:
-      - 'Precision pass: remove raw tool outputs (and other unused content) one category at a time, re-checking downstream success'
-      - 'Accept 12k tokens; recall is all that matters'
-      - 'Cut the summary to 1k tokens in one step'
-      - 'Switch to trimming'
-    answer: [A]
+      - 'Switch to a trimming heuristic, since the summaries are now larger than the turns they replace'
+      - 'Accept the 12k-token summaries, since 98% downstream success shows that recall is what matters'
+      - 'Precision pass: remove raw outputs and other unused content step by step, re-checking success'
+      - 'Cut the summary to 1k tokens in one step, then add back whatever the agent turns out to need'
+    answer: [C]
     explain: >-
       After recall comes precision: iterate, measuring that success holds as each element is removed.
 
@@ -212,11 +217,11 @@ questions:
     q: >-
       Which item from a long trace should be kept in compaction even though it is a "negative" result?
     options:
-      - '"Connecting via the legacy endpoint failed: it requires OAuth, use /v2 instead."'
-      - '"Thanks for waiting!"'
-      - 'A 3,000-token raw error page'
-      - 'A duplicated search result'
-    answer: [A]
+      - 'The 3,000-token raw error page from the failed connection'
+      - 'A second copy of the search result that found the /v2 endpoint'
+      - '"Thanks for waiting, I''m checking the other endpoint now!"'
+      - '"Legacy endpoint failed because it requires OAuth; use /v2 instead."'
+    answer: [D]
     explain: >-
       The lesson from a failure prevents repeating it; the raw payload isn't needed.
 
@@ -226,11 +231,11 @@ questions:
       A monitoring agent reviews a continuous stream of alerts; each alert is handled independently within a few turns. Which strategy
       is appropriate as the context fills?
     options:
-      - 'A trimming heuristic (keep the system prompt and the last N turns)'
-      - 'LLM compaction with conservative, detailed summaries'
-      - 'A multi-agent system with one sub-agent per alert type'
-      - 'A larger model'
-    answer: [A]
+      - 'A model with a larger context window, so no turns need to be dropped'
+      - 'LLM compaction with conservative, detailed summaries of every alert'
+      - 'A multi-agent system with one long-lived sub-agent per alert type'
+      - 'A trimming heuristic: keep the system prompt and the last N turns only'
+    answer: [D]
     explain: >-
       Independent, recency-local work doesn't need summaries; trimming is cheaper and sufficient.
 
@@ -240,10 +245,10 @@ questions:
       After compaction, an agent forgets that the user still owes an answer about the delivery address, and never asks again. Which
       revision fixes this?
     options:
-      - 'Include open questions and next steps in the summary'
-      - 'Include all user messages verbatim'
-      - 'Include all tool outputs'
-      - 'Compact less often'
+      - 'Include open questions and pending next steps in the summary'
+      - 'Include all of the user''s messages verbatim in the summary'
+      - 'Include the outputs of all tool calls made during the session'
+      - 'Compact less often, so the open question stays in the verbatim tail'
     answer: [A]
     explain: >-
       Open items were dropped. Listing them is cheap and keeps the thread of the task.
@@ -253,11 +258,11 @@ questions:
     q: >-
       Where should the compaction trigger be set?
     options:
+      - 'Only when the user asks for it, so the agent never loses context that the user still needs'
       - 'At a threshold before measured quality degradation (e.g. ~70–80% of the window), not at the hard limit'
-      - 'Exactly at 100% of the window'
-      - 'After every single turn'
-      - 'Only when the user asks'
-    answer: [A]
+      - 'After every turn, so the context is always a fresh summary and never accumulates raw history'
+      - 'At 100% of the window, so compaction runs only when it can''t be avoided and costs as little as possible'
+    answer: [B]
     explain: >-
       Compacting at the hard limit means the agent already worked through the degraded zone.
 
@@ -267,10 +272,10 @@ questions:
       A coding agent's history includes three superseded implementation plans and the final agreed plan. What should the compacted
       context keep?
     options:
-      - 'The final agreed plan (and why the others were rejected, in a line each)'
-      - 'All four plans in full'
-      - 'Only the first plan'
-      - 'None of the plans'
-    answer: [A]
+      - 'The first plan and the final plan, to show how the design has evolved'
+      - 'None of the plans; the code that was written already reflects the decision'
+      - 'The final agreed plan, plus one line on why each alternative was rejected'
+      - 'All four plans in full, so the agent can compare them if questions come up'
+    answer: [C]
     explain: >-
       Superseded drafts can go; the current decision and the reasons for rejecting alternatives prevent backsliding.

@@ -33,7 +33,8 @@ weight: 18
 | **Knowledge** (not "memory") | documents, policies, product data | as long as the corpus | AI Search indexes, Genie, UC tables |
 
 Memory research names: **episodic** (what happened in a session), **semantic** (facts), **procedural** (how to do things).
-Databricks' docs call the session store *episodic* memory and the long-term store *derived* memory.
+Databricks' docs simply say **short-term** memory (one session, thread ids and checkpointing) and **long-term** memory (key
+information extracted and kept across conversations).
 
 [[diagram:memory-layers]]
 

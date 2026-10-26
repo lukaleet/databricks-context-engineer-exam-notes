@@ -6,14 +6,15 @@ questions:
       A travel agent asks every new session which airline loyalty program the user belongs to, although the user answered in every
       previous session. Conversation history is persisted per thread. What is the mismatch, and the fix?
     options:
-      - 'Cross-session facts are kept only in session history; write them to a long-term store namespaced by user and recall them at session start'
-      - 'The thread_id changes every session; reuse one thread_id per user forever'
-      - 'The model''s context window is too small; use a larger model'
-      - 'Add the loyalty program question to the system prompt'
-    answer: [A]
+      - 'Each session gets a new thread_id; reuse a single thread_id per user forever so the whole history is always loaded'
+      - 'Cross-session facts live only in session history; write them to a per-user long-term store'
+      - 'The answer is lost to trimming; raise the sliding-window size so earlier sessions'' answers stay in the context'
+      - 'The checkpointer isn''t loading earlier threads; call checkpointer.setup() at the start of each session to restore them'
+    answer: [B]
     explain: >-
-      Session memory doesn't carry across sessions by design. Durable preferences belong in long-term memory. Reusing one thread
-      forever would make the history grow without limit and mix unrelated conversations.
+      Session memory doesn't carry across sessions by design; durable facts belong in a long-term store namespaced by user. Reusing one
+      thread forever would grow the history without limit and mix unrelated conversations; setup() only creates tables; and a bigger
+      trimming window doesn't reach into other threads.
 
   - id: d4-02
     objective: Identify the mismatch between the memory type being used and the information need, and select the correct memory strategy
@@ -21,10 +22,10 @@ questions:
       Mid-conversation, a user says "Book the 9am flight instead, like I just said." The agent searches long-term memory, finds an old
       preference for evening flights, and books 6pm. What is the mismatch?
     options:
-      - 'It retrieved from long-term memory when the needed information was in the current session'
-      - 'The long-term store has too few memories'
-      - 'The checkpointer is missing setup()'
-      - 'The embedding model is too small'
+      - 'It retrieved from long-term memory when the needed information was already in the current session'
+      - 'The long-term store holds too few memories, so the evening-flight preference outweighed the rest'
+      - 'It relied on session history when the needed information required cross-session persistence'
+      - 'The checkpointer''s setup() was never called, so the current session''s messages weren''t available'
     answer: [A]
     explain: >-
       The current session holds the latest, explicit instruction. Long-term memory is for cross-session information and shouldn't
@@ -70,38 +71,40 @@ questions:
       A LangGraph agent with a Lakebase checkpointer loses the conversation after every request, although the checkpoint tables
       contain data. Each call is `graph.invoke({"messages": [...]})`. What is missing?
     options:
-      - 'A config with the conversation''s thread id: `config={"configurable": {"thread_id": ...}}`'
-      - 'A larger Lakebase instance'
-      - 'An AI Search index over the checkpoints'
-      - 'A call to checkpointer.setup() before every request'
-    answer: [A]
+      - 'The checkpointer passed to `graph.invoke(..., checkpointer=checkpointer)` on every request'
+      - 'A config with the conversation''s thread id on each call: `config={"configurable": {"thread_id": ...}}`'
+      - 'A call to `checkpointer.setup()` before every request so the tables are reloaded for the call'
+      - 'A `store=` argument in `compile()` so the graph can find earlier conversations by similarity'
+    answer: [B]
     explain: >-
-      Checkpoints are keyed by thread_id. Without it the graph can't load the previous state for that conversation. setup() runs once,
-      not per request.
+      Checkpoints are keyed by thread_id, passed in the config of each call. Without it the graph can't load the previous state. setup()
+      runs once to create tables, the checkpointer belongs in compile(), not invoke(), and a store is for long-term memory, not thread
+      state.
 
   - id: d4-05
     objective: Configure persistent agent memory across sessions using Lakebase-backed durable store
     q: >-
       Which `databricks-langchain` class provides LangGraph long-term memory on Lakebase with semantic search over stored items?
     options:
-      - '`DatabricksStore` (with `embedding_endpoint` and `embedding_dims`)'
-      - '`CheckpointSaver`'
-      - '`VectorSearchRetrieverTool`'
-      - '`ChatDatabricks`'
-    answer: [A]
+      - '`VectorSearchRetrieverTool`, pointed at an index over the checkpoint tables'
+      - '`DatabricksStore`, given an `instance_name`, `embedding_endpoint` and `embedding_dims`'
+      - '`CheckpointSaver`, given an `instance_name` and an embedding endpoint'
+      - '`AsyncCheckpointSaver`, which adds similarity search to thread checkpoints'
+    answer: [B]
     explain: >-
       `DatabricksStore` implements the LangGraph store on Lakebase and enables semantic search when given an embedding endpoint and
-      dimensions. `CheckpointSaver` is short-term (per-thread) state.
+      dimensions. `CheckpointSaver` and `AsyncCheckpointSaver` persist per-thread (short-term) state and have no similarity search;
+      `VectorSearchRetrieverTool` queries AI Search indexes, not the memory store.
 
   - id: d4-06
     objective: Configure persistent agent memory across sessions using Lakebase-backed durable store
     q: >-
       Long-term memories are stored with `store.put(("memories", user_id), key, value)`. Where should `user_id` come from?
     options:
-      - 'From the authenticated request context in application code'
-      - 'From the model, by asking it to extract the user''s name from the conversation'
-      - 'From a random UUID generated per session'
-      - 'From the thread_id'
+      - 'From the authenticated request context, set by application code'
+      - 'From the thread_id, since every thread belongs to exactly one user'
+      - 'From a new random UUID generated at the start of each session'
+      - 'From the model, which extracts the user''s name from the conversation'
     answer: [A]
     explain: >-
       Memory scope must come from trusted context (the verified identity), never from model output, or users could read or write
@@ -113,11 +116,11 @@ questions:
       An agent validates 12,000 vendor records over several nightly runs and must resume after failures without redoing work. Where
       should progress be tracked?
     options:
-      - 'In a Delta-backed state table with one row per record and its status'
-      - 'In an in-context scratchpad list'
-      - 'In the compaction summary'
-      - 'In the system prompt, updated after each run'
-    answer: [A]
+      - 'In the long-term memory store, as one free-text memory note per completed run'
+      - 'In a Delta-backed state table with one row per vendor record and its status'
+      - 'In an in-context scratchpad list that the agent updates after each record'
+      - 'In the compaction summary, which carries progress from one run to the next'
+    answer: [B]
     explain: >-
       Many items, multiple runs, resumability and exact per-item status all require a durable state object outside the context.
 
@@ -126,11 +129,11 @@ questions:
     q: >-
       In which case is an in-context scratchpad sufficient instead of a durable state object?
     options:
-      - 'A single-session task of six reasoning steps whose notes easily fit in the window and aren''t needed afterwards'
-      - 'A task shared by three agents updating the same progress'
-      - 'A task that must be audited later'
-      - 'A task spanning several days and restarts'
-    answer: [A]
+      - 'A task in which three agents update the same progress list while working in parallel'
+      - 'A single-session, six-step task whose notes fit easily in the window and aren''t needed later'
+      - 'A task whose progress must be audited later to show who processed which item and when'
+      - 'A task that spans several days and has to resume where it stopped after each restart'
+    answer: [B]
     explain: >-
       Short, single-session work with small notes doesn't need persistence. Sharing, auditability and multi-run durability call for a
       state table.
@@ -140,11 +143,11 @@ questions:
     q: >-
       An agent's memories live in Lakebase. Which question should be answered with a structured SQL query rather than semantic search?
     options:
-      - '"How many support tickets did this customer open since July 1?"'
+      - '"Summarize what we discussed about the migration last month."'
       - '"What does this customer usually care about when choosing a plan?"'
-      - '"Summarize what we discussed about the migration."'
       - '"Does the user have any preferences about report style?"'
-    answer: [A]
+      - '"How many support tickets did this customer open since July 1?"'
+    answer: [D]
     explain: >-
       Counts, dates and exact filters are structured queries. Fuzzy, meaning-based recall suits semantic search.
 
@@ -154,11 +157,11 @@ questions:
       Memories are stored as short free-text notes. A user asks "what did I say about dashboards I dislike?" Which retrieval
       mechanism fits?
     options:
-      - 'Semantic search (AI Search index or the store''s embedding search) over the notes'
-      - 'An exact key lookup on the key "dashboards"'
-      - 'A SQL COUNT over the notes table'
-      - 'Loading all notes into the context'
-    answer: [A]
+      - 'A SQL query that filters the notes table with `LIKE ''%dashboard%''` and returns all matches'
+      - 'An exact key lookup on the key "dashboards" in the user''s memory namespace'
+      - 'Load all of the user''s notes into the context and let the model find the relevant ones'
+      - 'Semantic search over the notes (an AI Search index or the store''s embedding search)'
+    answer: [D]
     explain: >-
       The wording of the question differs from how notes were written, so meaning-based search fits. Loading all notes pollutes the
       context.
@@ -168,14 +171,15 @@ questions:
     q: >-
       An agent loads all 300 stored memories for a user into the system prompt at session start. Which problem is most likely?
     options:
-      - 'Context pollution and high cost on every call, with irrelevant or outdated memories influencing answers'
-      - 'Memories can''t be found because they''re not in the window'
-      - 'The checkpointer can''t store the thread'
-      - 'Latency increases because of extra tool calls'
-    answer: [A]
+      - 'Under-retrieval, because the model can''t attend to memories loaded into the system prompt'
+      - 'Context pollution: irrelevant or outdated memories influence answers, at a cost on every call'
+      - 'Higher latency from the extra memory tool calls the agent has to make before answering each turn'
+      - 'The checkpointer can''t persist the thread because the system prompt exceeds its row size'
+    answer: [B]
     explain: >-
-      Static loading of large memory is over-retrieval: tokens on every call and confusion from irrelevant items. Extra tool calls are
-      a dynamic-retrieval cost, not a static one.
+      Loading a large memory up front is over-retrieval: tokens on every call and confusion from irrelevant or outdated items. The
+      memories are in the window, so this isn't under-retrieval, and extra tool calls are a cost of dynamic retrieval, not static
+      loading.
 
   - id: d4-12
     objective: Evaluate the tradeoffs of static retrieval vs dynamic retrieval from Lakebase for a given agent architecture
@@ -183,11 +187,11 @@ questions:
       Which design balances static and dynamic memory retrieval for an assistant with a small stable profile and a large, growing set
       of past-project notes?
     options:
-      - 'Load the small profile at session start (static) and give the agent a memory search tool for project notes (dynamic)'
-      - 'Load everything at session start'
-      - 'Load nothing and ask the user to repeat context'
-      - 'Store everything in the system prompt and edit it monthly'
-    answer: [A]
+      - 'Load the profile and all project notes at session start, so no memory tool calls are needed during the session'
+      - 'Keep the profile and a digest of project notes in the system prompt and regenerate the digest monthly'
+      - 'Load the small profile at session start and give the agent a memory search tool for project notes'
+      - 'Retrieve both the profile and the project notes dynamically on every turn, so nothing is loaded up front'
+    answer: [C]
     explain: >-
       A small always-relevant core is cheap to load; large, topic-specific memory is retrieved only when needed.
 
@@ -196,10 +200,10 @@ questions:
     q: >-
       What is a main risk of purely dynamic memory retrieval (the agent decides when to call a memory tool)?
     options:
-      - 'The agent may not query memory when it should, missing relevant history (under-retrieval)'
-      - 'Every memory is loaded into every prompt'
-      - 'Memories can''t be updated'
-      - 'It requires a Direct Access index'
+      - 'The agent may not query memory when it should (under-retrieval)'
+      - 'Memory search needs a Direct Access index, which must be maintained by hand'
+      - 'Every stored memory ends up in every prompt, polluting the context (over-retrieval)'
+      - 'Memories become read-only once they have been retrieved through a tool call'
     answer: [A]
     explain: >-
       Dynamic retrieval depends on the agent asking at the right time and with a good query. Static loading has the opposite risk.
@@ -210,11 +214,11 @@ questions:
       A personal assistant retrieves the top 25 memories per turn with no similarity threshold. Answers increasingly mention unrelated
       old preferences and occasionally contradict each other. Which change addresses it most directly?
     options:
-      - 'Lower k and add a relevance threshold (optionally weight recency), and consolidate duplicate or outdated memories'
-      - 'Raise k to 50 so the right memory is always included'
-      - 'Switch to a model with a bigger window'
-      - 'Delete the long-term store'
-    answer: [A]
+      - 'Switch long-term memory retrieval from semantic search to the 25 most recent memories per turn'
+      - 'Move to a model with a bigger context window so the 25 memories no longer crowd the conversation'
+      - 'Raise k to 50 so the most relevant memory is always among those included in the context'
+      - 'Lower k, add a relevance threshold, and consolidate duplicate or outdated memories'
+    answer: [D]
     explain: >-
       This is over-retrieval (context pollution). Retrieve fewer, more relevant memories and clean up conflicting ones.
 
@@ -224,14 +228,15 @@ questions:
       A project assistant often contradicts decisions the team made in earlier sessions. Traces show the memory search returns nothing
       for most queries. The store contains only greetings and timestamps. What is the problem?
     options:
-      - 'Under-retrieval caused by poor memory writing: decisions were never extracted and saved as memories'
-      - 'Over-retrieval caused by too high k'
-      - 'The reranker is disabled'
-      - 'The checkpointer uses the wrong thread_id'
+      - 'Under-retrieval: the decisions were never extracted and saved as memories'
+      - 'The reranker is disabled, so the memories holding the decisions are ranked below the greetings'
+      - 'Over-retrieval caused by a high k, which floods the context with greetings and hides the decisions'
+      - 'The checkpointer uses a new thread_id per session, so the earlier sessions'' decisions can''t be loaded'
     answer: [A]
     explain: >-
       You can only retrieve what was written. Save salient facts and decisions (or run a memory pipeline that distills them from
-      sessions).
+      sessions). Over-retrieval or ranking problems would return irrelevant memories, not nothing, and thread ids affect session state,
+      not the long-term store.
 
   - id: d4-16
     objective: Identify the pipeline stage where user intent should be resolved before context retrieval
@@ -239,11 +244,11 @@ questions:
       A banking assistant's answers are factually accurate but often answer a different question: asked "what's the fee?" after
       discussing international transfers, it returns the card annual fee. Where should the pipeline change?
     options:
-      - 'Add an intent-resolution / query-rewriting stage before retrieval that uses the session to produce a self-contained query'
-      - 'Add a reranker after retrieval'
-      - 'Increase top-k so both fees are retrieved'
-      - 'Fine-tune the LLM on fee questions'
-    answer: [A]
+      - 'Add a reranker after retrieval so that the fee document closest to the raw question is ranked first'
+      - 'Fine-tune the LLM on fee questions so it learns which fee customers usually mean in each context'
+      - 'Add an intent-resolution (query-rewriting) stage before retrieval that uses the session'
+      - 'Increase top-k so that both the transfer fee and the card fee are retrieved and the model can choose'
+    answer: [C]
     explain: >-
       Retrieval ran on an ambiguous raw message. Resolving intent first (using the session context) retrieves the right fee. Retrieving
       both fees adds noise and leaves the choice to chance.
@@ -253,10 +258,10 @@ questions:
     q: >-
       Which pipeline order is correct for an agent that retrieves context based on multi-turn conversations?
     options:
-      - 'Load session context → resolve intent and entities (rewrite the query) → retrieve → generate'
-      - 'Retrieve → resolve intent → generate'
-      - 'Generate → retrieve → resolve intent'
-      - 'Retrieve → generate → resolve intent'
+      - 'Load session context → resolve intent (rewrite the query) → retrieve → generate'
+      - 'Load session context → retrieve on the raw message → resolve intent → generate'
+      - 'Retrieve on the raw message → resolve intent using the retrieved chunks → generate'
+      - 'Retrieve → generate a draft → resolve intent → regenerate with the resolved intent'
     answer: [A]
     explain: >-
       Intent must be resolved before retrieval so that the query reflects what the user means in context.
@@ -268,9 +273,9 @@ questions:
       "Reliable" means strong on all three, with none lagging. How should the engineer identify that configuration?
     options:
       - 'Use the parallel coordinates chart to find the run that stays high on every metric axis'
-      - 'Pick the highest arithmetic mean of the three metrics'
+      - 'Rank the runs by the arithmetic mean of the three metrics and pick the highest mean'
+      - 'Compute each run''s spread across the three metrics and pick the run with the smallest spread'
       - 'Pick the run with the single highest metric value'
-      - 'Pick the run with the smallest spread between its metrics'
     answer: [A]
     explain: >-
       A mean can hide one weak metric; the single best value ignores the others; a small spread can be uniformly low. Parallel
@@ -282,11 +287,11 @@ questions:
       Config X scored correctness 0.91 in one run; config Y scored 0.88, 0.89 and 0.88 in three runs. X's two reruns scored 0.74 and
       0.95. Which is more reliable for production, and why?
     options:
-      - 'Y, because its results are consistently high across repeated runs while X varies widely'
-      - 'X, because it achieved the highest single score'
-      - 'X, because its average is higher'
-      - 'Neither can be compared across runs'
-    answer: [A]
+      - 'Neither, because results from separate runs of an LLM can''t be compared'
+      - 'X, because it achieved the highest single score and can reach that level again'
+      - 'Y, because it is consistently high across repeated runs'
+      - 'X, because its three-run average is higher once the outlier run is excluded'
+    answer: [C]
     explain: >-
       Reliability includes stability. X averages ~0.87 with a wide spread; Y is steady at ~0.88. Run each configuration several times
       because LLM outputs are non-deterministic.
@@ -297,11 +302,11 @@ questions:
       A deployed agent (Model Serving / Agent Framework) receives requests from a front end. How should the front end tell the agent
       which conversation thread to continue?
     options:
+      - 'Add the thread id to the system prompt, so the agent reads it before loading the conversation'
+      - 'Deploy one serving endpoint per conversation and encode the thread id in the endpoint name'
+      - 'Let the agent infer the thread from the message text by matching it against stored conversations'
       - 'Pass the thread id in `custom_inputs`, e.g. `extra_body={"custom_inputs": {"thread_id": tid}}`'
-      - 'Put the thread id in the system prompt'
-      - 'Encode it in the endpoint name'
-      - 'The agent infers it from the message text'
-    answer: [A]
+    answer: [D]
     explain: >-
       Databricks agents receive conversation identifiers via custom inputs (the Playground and Review App send them automatically).
 
@@ -311,11 +316,11 @@ questions:
       When logging an agent that uses a Lakebase database for memory, how should the dependency be declared so the deployed endpoint
       can authenticate to it?
     options:
+      - 'Grant the serving endpoint''s service principal workspace admin so it can reach any database'
+      - 'Nothing; deployed agents can reach every Lakebase instance in the workspace automatically'
       - 'Declare a `DatabricksLakebase(database_instance_name=...)` resource when logging the model'
-      - 'Hard-code a personal access token in the agent code'
-      - 'Grant the endpoint workspace admin'
-      - 'No declaration is needed for Lakebase'
-    answer: [A]
+      - 'Store a personal access token in the agent code and use it to connect to the database'
+    answer: [C]
     explain: >-
       Declaring resources lets Databricks provision credentials for the deployed agent (automatic auth passthrough) instead of
       embedding secrets.
@@ -326,11 +331,11 @@ questions:
       After a server restart, users of a chat agent find their ongoing conversations reset, although long-term preferences are intact.
       What should be added?
     options:
-      - 'A durable checkpointer (e.g. on Lakebase) for session state, keyed by thread id'
-      - 'More long-term memories'
-      - 'A larger embedding model'
-      - 'A sliding window'
-    answer: [A]
+      - 'A larger embedding model so that resumed conversations are matched more reliably'
+      - 'A durable checkpointer (e.g. on Lakebase) for session state, keyed by the thread id'
+      - 'A sliding window that keeps the last few turns of every conversation in process memory'
+      - 'More long-term memories, written after every turn so conversations can be rebuilt'
+    answer: [B]
     explain: >-
       Long-term memory works; session state was only in process memory. A durable checkpointer persists threads across restarts.
 
@@ -339,12 +344,12 @@ questions:
     q: >-
       Which TWO queries over an agent's memory and interaction history in Lakebase are best served by structured SQL?
     options:
-      - '"The last five orders this user discussed, newest first"'
-      - '"All memories created between Oct 1 and Oct 15"'
-      - '"Things the user finds frustrating"'
       - '"Topics similar to data quality"'
+      - '"All memories created between Oct 1 and Oct 15"'
+      - '"The last five orders this user discussed, newest first"'
       - '"What kind of tone does the user like?"'
-    answer: [A, B]
+      - '"Things the user finds frustrating"'
+    answer: [B, C]
     explain: >-
       Ordering, limits and date ranges are exact, structured operations. The others are meaning-based and suit semantic search.
 
@@ -354,11 +359,11 @@ questions:
       A memory system stores every message of every session as a separate long-term memory. Retrieval returns many near-duplicate,
       partly outdated entries. Which improvement targets the cause?
     options:
-      - 'Write distilled facts instead of raw messages and consolidate/deduplicate memories (e.g. a memory pipeline), updating outdated ones'
-      - 'Raise k so the newest duplicate is included'
-      - 'Store the memories in the system prompt instead'
-      - 'Turn off the embedding index'
-    answer: [A]
+      - 'Move the memories from the long-term store into the system prompt so the model sees them all at once'
+      - 'Raise k so that the newest of the duplicate entries is always among the memories that are retrieved'
+      - 'Turn off the embedding index and retrieve memories by recency only, so outdated entries are skipped'
+      - 'Write distilled facts instead of raw messages, and consolidate and deduplicate them'
+    answer: [D]
     explain: >-
       Memory quality starts at write time. Distilled, consolidated memories reduce pollution and contradictions.
 
@@ -368,11 +373,11 @@ questions:
       Three sub-agents process parts of the same migration checklist and need to see which items the others have completed. Where
       should progress live?
     options:
-      - 'In a shared durable state table (Delta or Lakebase) that all agents read and update'
-      - 'In each sub-agent''s own scratchpad'
-      - 'In the orchestrator''s compaction summary only'
-      - 'In each sub-agent''s system prompt'
-    answer: [A]
+      - 'In the orchestrator''s compaction summary, sent to the sub-agents with each new dispatch'
+      - 'In each sub-agent''s own scratchpad, merged by the orchestrator at the end of the task'
+      - 'In each sub-agent''s long-term memory namespace, searched semantically before each item'
+      - 'In a shared durable state table (Delta or Lakebase) that all three agents read and update'
+    answer: [D]
     explain: >-
       Shared, concurrently updated progress needs a durable store outside any single context window.
 
@@ -381,10 +386,10 @@ questions:
     q: >-
       Why is Lakebase rather than a Delta table used to back an agent's per-turn conversation checkpoints?
     options:
-      - 'Lakebase is an OLTP Postgres database with low-latency single-row reads and writes, which every turn needs'
-      - 'Delta tables can''t store JSON'
-      - 'Lakebase is cheaper for petabyte-scale analytics'
-      - 'Delta tables aren''t governed by Unity Catalog'
+      - 'Lakebase is OLTP Postgres, built for the low-latency row reads and writes every turn needs'
+      - 'Delta tables aren''t governed by Unity Catalog, so per-user conversation data can''t be protected'
+      - 'Lakebase is optimized for petabyte-scale analytics over the full history of all conversations'
+      - 'Delta tables can''t store the nested JSON state that LangGraph writes for each checkpoint'
     answer: [A]
     explain: >-
       Checkpointing is many small transactional reads and writes. Delta is optimized for analytical and batch workloads.
@@ -395,23 +400,24 @@ questions:
       A user asks "What's the company's travel policy hotel cap?" and the agent answers from a long-term memory note in which the user
       once mentioned "my team usually spends about 150". The official policy says 180. What is wrong?
     options:
-      - 'Organizational knowledge was taken from personal memory instead of the authoritative knowledge source (retrieval over the policy corpus)'
-      - 'The memory store needs more entries'
-      - 'The session checkpointer is missing'
-      - 'The answer is correct because memory is more personal'
-    answer: [A]
+      - 'The session checkpointer is missing, so the agent couldn''t see the policy mentioned earlier'
+      - 'The memory store needs more entries about travel so the correct cap is retrieved next time'
+      - 'Policy knowledge came from personal memory instead of the authoritative source'
+      - 'The memory was retrieved with semantic search; a structured SQL query would have found 180'
+    answer: [C]
     explain: >-
-      Memory holds user-specific facts and preferences; policies are knowledge and must come from the governed corpus.
+      Memory holds user-specific facts and preferences; company policy is knowledge and must come from the governed, authoritative
+      corpus. More memory entries or a different query mechanism over memory would still answer from the wrong source.
 
   - id: d4-28
     objective: Identify which context configuration produced the most reliable outcomes from MLflow 3 experiment results
     q: >-
       To compare memory strategies fairly in MLflow, what must be held constant across runs?
     options:
-      - 'The evaluation dataset and the scorers (metrics), so only the context configuration differs'
-      - 'The run names'
-      - 'The time of day the runs execute'
-      - 'The number of tokens in each answer'
-    answer: [A]
+      - 'The number of tokens in each answer, so that costs are comparable'
+      - 'The evaluation dataset and the scorers, so only the context configuration differs between runs'
+      - 'The run names, tags and experiment, so that the runs line up side by side in the comparison view'
+      - 'The model temperature only, since the evaluation dataset can be resampled for each run'
+    answer: [B]
     explain: >-
       Same data, same scorers, one variable changed: otherwise differences can't be attributed to the configuration.

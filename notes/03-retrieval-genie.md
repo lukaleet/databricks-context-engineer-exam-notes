@@ -165,9 +165,29 @@ Use the MLflow trace (RETRIEVER span: which chunks, from which source) and retri
 > **Exam pattern:** "prompt the agent to prefer official sources" is weak. Governance happens in **UC and the index definition**, so
 > derived data never enters the retrieval space.
 
+## 3.10 Governing what enters the context: PII, quality, policy
+
+The exam guide's audience description says governance of what enters the context relies on Unity Catalog's metadata layer:
+**data quality, PII handling and policy enforcement**. The rule is the same as in §3.9: enforce it **in UC, before retrieval**, not with a
+prompt instruction.
+
+| Concern | UC mechanism | Effect on the agent's context |
+|---|---|---|
+| Find sensitive columns | **Data classification** detects PII (names, emails, ids…) and applies **governed tags** | you know which sources need protection before indexing them |
+| Hide or redact sensitive values | **Column masks** (`ALTER TABLE … ALTER COLUMN … SET MASK fn`) | the agent (or the user, on-behalf-of) sees redacted values in query results |
+| Restrict which rows are visible | **Row filters** (`ALTER TABLE … SET ROW FILTER fn ON (col)`) | queries return only permitted rows |
+| Apply both at scale | **ABAC policies** on governed tags | one policy protects every table carrying the tag |
+| Keep PII out of a vector index | mask or drop PII **before chunking** (step 3 in §3.6), index only the cleaned table | embeddings and retrieved chunks never contain the raw values |
+| Low-quality or stale data | expectations / constraints in pipelines, data quality monitoring, freshness checks via lineage | bad rows are stopped or flagged before they become context |
+
+> **Exam pattern:** "the agent quoted a customer's phone number from a retrieved chunk" → mask/remove PII before indexing (and apply
+> masks on the source), not "tell the model never to reveal phone numbers". Note: a column mask on the source table does not
+> retroactively clean text already embedded in an index; re-index from the cleaned table.
+
 ### Quick self-check
 
 - The index answers with last week's text and the source table is correct. Index type Delta Sync, triggered. Fix? *(sync after the ingestion job)*
 - Users search by error code `E-4012` and get unrelated results. *(hybrid search)*
 - Pre-inference or just-in-time for an agent reconciling invoices against live order tables? *(just-in-time)*
 - Retrieved chunks come from `sandbox.tmp_policies`. Governance fix? *(deprecate it, certify the source, rebuild the index from certified data, remove access)*
+- Retrieved chunks contain customers' email addresses. Fix? *(mask/remove PII before chunking, re-index the cleaned table; masks or ABAC on the source)*

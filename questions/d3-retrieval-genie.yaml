@@ -7,11 +7,11 @@ questions:
       table with amended policies. Two weeks later, the agent still quotes pre-amendment text, although the table has the new text.
       What is the most cost-effective fix?
     options:
-      - 'Add a task to the nightly job that calls sync on the index after ingestion completes'
-      - 'Switch the index to CONTINUOUS sync'
-      - 'Drop and recreate the index every night'
-      - 'Replace it with a Direct Access index and upsert vectors manually'
-    answer: [A]
+      - 'Switch pipeline_type to CONTINUOUS so the index picks up source changes within seconds'
+      - 'Add a task to the nightly job that calls sync on the index as soon as ingestion completes'
+      - 'Replace it with a Direct Access index and upsert the changed vectors from the nightly job'
+      - 'Drop and recreate the index every night from the current snapshot of the Delta table'
+    answer: [B]
     explain: >-
       A triggered index only updates when sync runs. For data that changes nightly, syncing right after the job is cheapest. Continuous
       sync costs more for no benefit; recreating or switching index types is heavy-handed.
@@ -22,14 +22,15 @@ questions:
       Engineers search an incident knowledge base for exact error codes such as `ERR-50213`. The agent retrieves passages about
       similar-sounding errors instead. The index uses default ANN queries. Which change most directly fixes this?
     options:
-      - 'Use `query_type="HYBRID"` so keyword matching complements vector similarity'
-      - 'Increase `num_results` from 5 to 50'
-      - 'Switch the embedding model to one with a longer context window'
-      - 'Lower the LLM temperature'
-    answer: [A]
+      - 'Enable the reranker so passages that mention the exact code are moved to the top of the results'
+      - 'Set `query_type="HYBRID"` so keyword matching complements vector similarity for the exact error codes'
+      - 'Switch to an embedding model with a longer context window so each chunk keeps more of its codes'
+      - 'Increase `num_results` from 5 to 50 so the passage with the exact code is more likely to be included'
+    answer: [B]
     explain: >-
-      Embeddings are weak at exact identifiers; hybrid search adds keyword matching (fused with RRF). Retrieving more results just
-      adds more near-misses to the context.
+      Embeddings are weak at exact identifiers; hybrid search adds keyword matching (fused with vector results by RRF), so the passage
+      with the exact code is retrieved. A reranker only reorders what was already retrieved, so it can't help if ANN never returns the
+      right passage. More results add more near-misses, and a longer embedding window doesn't make codes match exactly.
 
   - id: d3-03
     objective: Diagnose which AI Search configuration is the root cause and select the remediation that most directly improves signal quality
@@ -37,11 +38,11 @@ questions:
       MLflow traces show the relevant chunk is usually retrieved, but at rank 6–9 of 10, while the top results are loosely related.
       The agent uses only the top 3. What is the most direct remediation?
     options:
-      - 'Enable the AI Search reranker so the most relevant chunks move to the top'
-      - 'Increase chunk overlap to 50%'
-      - 'Switch the index to continuous sync'
-      - 'Add an instruction asking the agent to read all 10 chunks carefully'
-    answer: [A]
+      - 'Have the agent use all 10 chunks instead of 3, with an instruction to read every chunk carefully'
+      - 'Switch the index to continuous sync so recently changed chunks are scored with fresh embeddings'
+      - 'Increase chunk overlap to 50% so each relevant passage appears in more chunks and ranks higher'
+      - 'Enable the AI Search reranker so the most relevant retrieved chunks move into the top positions'
+    answer: [D]
     explain: >-
       The right content is retrieved but ranked badly: a ranking problem, which a reranker fixes. Sync and overlap don't change
       ranking.
@@ -52,14 +53,14 @@ questions:
       An HR agent answering employees in Germany often retrieves US benefits documents. Every chunk has a `country` metadata column
       in the source table. What is the most direct fix?
     options:
-      - 'Apply a metadata filter on `country` at query time (from the user''s trusted profile)'
-      - 'Tell the agent in the system prompt to ignore US documents'
-      - 'Increase the number of retrieved chunks'
-      - 'Use a larger LLM'
-    answer: [A]
+      - 'Switch to hybrid search so the word "Germany" in the question matches German documents'
+      - 'Increase the number of retrieved chunks so German documents are always among the results'
+      - 'Apply a metadata filter on `country` at query time, set from the user''s trusted profile'
+      - 'Tell the agent in the system prompt to ignore documents that describe US benefits'
+    answer: [C]
     explain: >-
-      Filtering keeps irrelevant documents out of the retrieval space entirely. A prompt instruction leaves them in the context, which
-      risks confusion.
+      A metadata filter keeps other countries' documents out of the results entirely. A prompt instruction leaves them in the context
+      (risking confusion), more chunks add more US documents, and hybrid search matches words but doesn't enforce a country.
 
   - id: d3-05
     objective: Select an appropriate chunking strategy given document structure, embedding model context length, and query types
@@ -67,11 +68,11 @@ questions:
       A corpus of internal wiki pages ranges from 150 to 4,000 words with no consistent headings. Users ask both broad ("How does
       onboarding work?") and narrow ("What's the VPN timeout?") questions. Which chunking strategy fits best?
     options:
+      - 'One chunk per sentence, so narrow lookups always find a chunk that matches exactly'
+      - 'Fixed 2,000-token chunks with no overlap, so even the longest pages need only two chunks'
       - 'A recursive character splitter with ~512–1,024-token chunks and 10–15% overlap'
-      - 'One chunk per page, since the embedding model accepts 8k tokens'
-      - 'One chunk per sentence for maximum precision'
-      - 'Fixed 4,000-token chunks with no overlap'
-    answer: [A]
+      - 'One chunk per page, since the embedding model accepts 8k tokens and keeps each page whole'
+    answer: [C]
     explain: >-
       Without structure to follow, a recursive splitter with moderate size and some overlap balances broad and narrow queries.
       Whole pages blur many topics into one vector; sentences lose context.
@@ -81,11 +82,11 @@ questions:
     q: >-
       A team uses an embedding model with a 512-token context window and creates 1,500-token chunks. What happens?
     options:
-      - 'Text beyond 512 tokens is truncated before embedding, so the end of each chunk isn''t represented in its vector'
-      - 'The model automatically splits the chunk into three vectors'
-      - 'The index creation fails with an error'
-      - 'Nothing; the vector represents the whole chunk'
-    answer: [A]
+      - 'Nothing changes; the embedding still represents the full chunk, only with less precision'
+      - 'The model splits each chunk into three windows and stores the average of their vectors'
+      - 'Text past 512 tokens is truncated, so the end of each chunk isn''t embedded'
+      - 'Index creation fails with an error until the chunks are reduced to 512 tokens or less'
+    answer: [C]
     explain: >-
       Chunks must fit the embedding model's context length, or the remainder is silently truncated and can't be matched.
 
@@ -95,11 +96,11 @@ questions:
       Product manuals have consistent Markdown headings (## Installation, ## Troubleshooting, ...). Users ask about specific
       procedures. Which strategy best fits?
     options:
-      - 'Structure-aware chunking on headings, keeping the heading as metadata'
-      - 'Fixed-size chunks that ignore headings'
-      - 'Sentence-level chunks'
-      - 'One chunk per manual'
-    answer: [A]
+      - 'Sentence-level chunks, so each step of a procedure can be matched on its own'
+      - 'Fixed-size 512-token chunks with overlap, ignoring the headings for uniform chunk sizes'
+      - 'One chunk per manual, so every procedure is retrieved together with its full context'
+      - 'Structure-aware chunking on the headings, keeping each heading as chunk metadata'
+    answer: [D]
     explain: >-
       When documents have reliable structure, splitting on it keeps each procedure intact and labels it.
 
@@ -109,11 +110,11 @@ questions:
       An agent reconciles supplier invoices against purchase orders. Which records it needs depends on what earlier steps find, and the
       order tables change every few minutes. Which retrieval strategy fits?
     options:
-      - 'Just-in-time retrieval: the agent queries the Delta tables (or Genie / UC functions) through tools when each step needs data'
       - 'Pre-inference retrieval: embed the question and load the top-k invoice chunks before the first model call'
-      - 'Load all open purchase orders into the system prompt each morning'
-      - 'Fine-tune the model on last month''s invoices'
-    answer: [A]
+      - 'Load all open purchase orders into the system prompt each morning so every step has the full data'
+      - 'Index the purchase orders in AI Search with continuous sync and retrieve the top-k once per task'
+      - 'Just-in-time retrieval: the agent queries the live tables through tools at each step'
+    answer: [D]
     explain: >-
       The need emerges during the task and the data is live and structured, which is the case for just-in-time agentic retrieval.
 
@@ -123,10 +124,10 @@ questions:
       An FAQ bot answers single, self-contained questions over a handbook that changes twice a year. Latency must be minimal. Which
       retrieval approach fits best?
     options:
-      - 'Pre-inference retrieval: one AI Search query, top chunks inserted before a single model call'
-      - 'Just-in-time retrieval with a multi-step tool loop'
-      - 'A multi-agent system with a retrieval sub-agent'
-      - 'Load the entire handbook into every prompt'
+      - 'Pre-inference retrieval: one AI Search query, with the top chunks inserted before a single model call'
+      - 'A multi-agent system with a retrieval sub-agent that returns a condensed summary to the answerer'
+      - 'Just-in-time retrieval: let the agent call a search tool as many times as it needs per question'
+      - 'Load the full handbook into every prompt, since it changes only twice a year and can be cached'
     answer: [A]
     explain: >-
       For a stable corpus and self-contained questions, one up-front retrieval is fast and sufficient. Agentic loops add latency.
@@ -137,14 +138,15 @@ questions:
       A sales agent often reports revenue in local currency when users expect EUR. The table has `amount` and `amount_eur` columns with
       no comments. What is the highest-impact change?
     options:
+      - 'Add a system-prompt rule telling the agent to always report revenue in EUR'
+      - 'Add example SQL queries that use `amount_eur` for the most common revenue questions'
+      - 'Increase the reasoning budget so the agent works out which column holds EUR'
       - 'Add Unity Catalog column comments describing each column''s meaning and currency'
-      - 'Add more example SQL queries using `amount_eur`'
-      - 'Increase the reasoning budget'
-      - 'Rename the table'
-    answer: [A]
+    answer: [D]
     explain: >-
-      Column descriptions are the metadata agents and Genie use to pick columns. With the ambiguity resolved at the source, every
-      question benefits; example SQL covers only matching patterns.
+      Column descriptions are the metadata agents and Genie use to pick columns. Fixing the ambiguity at the source helps every question
+      and every consumer. Example SQL covers only matching patterns, a prompt rule has to be repeated in each agent and still doesn't
+      say which column is EUR, and more reasoning can't recover meaning that isn't in the metadata.
 
   - id: d3-11
     objective: Identify which missing or poorly specified metadata elements cause an accuracy gap and select the highest-impact configuration change
@@ -152,10 +154,10 @@ questions:
       Genie produces duplicated totals when joining `orders` and `customers` because it joins on `name` instead of `customer_id`.
       Which metadata change most directly fixes this?
     options:
-      - 'Declare primary and foreign key constraints in Unity Catalog (used by Genie as join relationships)'
-      - 'Add a sample question about orders per customer'
-      - 'Hide the `name` column in every table'
-      - 'Increase the warehouse size'
+      - 'Declare primary and foreign key constraints in Unity Catalog'
+      - 'Add a sample question about orders per customer that shows the correct join on customer_id'
+      - 'Add a general instruction explaining that orders and customers must be joined on customer_id'
+      - 'Hide the `name` column in both tables so Genie can no longer use it as a join key'
     answer: [A]
     explain: >-
       PK/FK constraints tell Genie how tables connect; they're saved as join relationships automatically.
@@ -167,11 +169,11 @@ questions:
       bronze raw-ingest table, a sandbox copy of `fct_revenue`, and a UC SQL function that computes deferred revenue with complex
       rules. Which objects should be curated into the space?
     options:
+      - 'The gold table, the sandbox copy and the function'
+      - 'All four objects, so Genie has the widest possible coverage'
+      - 'The gold table and the bronze table, for full history'
       - 'The certified gold table and the UC SQL function'
-      - 'All four, so Genie has maximum coverage'
-      - 'The bronze table and the sandbox copy'
-      - 'Only the sandbox copy, because it is the most recent'
-    answer: [A]
+    answer: [D]
     explain: >-
       Curate clean, authoritative tables and the function for logic too complex for a static query. Raw and duplicated derived tables
       cause confusion and wrong answers.
@@ -182,10 +184,10 @@ questions:
       Users need answers that combine five normalized tables, and Genie struggles with the joins. Which UC object most simplifies the
       space?
     options:
-      - 'A view (or metric view) that pre-joins and renames the needed fields'
-      - 'Adding the five tables plus 10 related tables'
-      - 'A longer general instruction explaining each join'
-      - 'A sample question for each join'
+      - 'A view (or metric view) that pre-joins the five tables and exposes only the needed fields'
+      - 'One sample question per join pattern, so users phrase questions the way Genie handles them'
+      - 'The five tables plus the related lookup tables, so Genie can find every join path itself'
+      - 'A detailed general instruction that explains how each of the five tables should be joined'
     answer: [A]
     explain: >-
       Pre-joining in a view removes complexity before Genie sees it. Databricks recommends starting with five or fewer tables and
@@ -196,13 +198,14 @@ questions:
     q: >-
       Which statement about using a UC SQL function as a trusted asset in a Genie space is correct?
     options:
-      - 'Space users need EXECUTE on the function, and answers produced with it are marked as verified'
-      - 'Genie rewrites the function body to fit each question'
-      - 'Functions can''t take parameters in Genie'
-      - 'Functions replace the need for any tables in the space'
-    answer: [A]
+      - 'Once a function is added, the space no longer needs tables for those questions'
+      - 'Users need EXECUTE on the function, and answers produced with it are verified answers'
+      - 'Functions added to a Genie space can''t take parameters; only example SQL queries can take them'
+      - 'Genie adapts the function''s SQL body to fit each question before running it'
+    answer: [B]
     explain: >-
-      Functions are trusted assets that Genie calls as-is (it can't view or change their SQL). Users need EXECUTE permission.
+      UC SQL functions can be trusted assets: they take parameters, Genie calls them as defined, and users need EXECUTE on each
+      function. Genie doesn't rewrite the function's SQL, and the space still needs its tables for other questions.
 
   - id: d3-15
     objective: Identify which retrieval failure mode is occurring using MLflow eval logs and UC metadata, and select the governance action that resolves it
@@ -210,11 +213,11 @@ questions:
       MLflow traces show a policy agent's RETRIEVER spans citing `sandbox.analyst_tmp.travel_policy_copy`. UC lineage shows it was
       copied from `main.policies.travel` six months ago and never updated. Which governance action most directly resolves the failure?
     options:
-      - 'Certify the authoritative table, deprecate the sandbox copy, rebuild the index from certified sources only, and remove the agent''s access to the sandbox schema'
-      - 'Add an instruction telling the agent to prefer documents from main.policies'
-      - 'Increase the reranker weight for newer documents'
-      - 'Re-sync the index'
-    answer: [A]
+      - 'Re-sync the index so that the chunks from the sandbox copy are refreshed with the latest embeddings'
+      - 'Add an instruction telling the agent to prefer documents from main.policies over copies in sandbox schemas'
+      - 'Add a recency boost to the reranker so newer versions of the travel policy outrank the old copy'
+      - 'Certify the source, deprecate the copy, re-index from certified data only, revoke sandbox access'
+    answer: [D]
     explain: >-
       The failure is a wrong (derived, stale) source inside the retrieval space. Governance removes it from that space. Re-syncing
       would just re-index the stale copy.
@@ -225,11 +228,11 @@ questions:
       MLflow's RetrievalSufficiency judge fails on most questions about the 2026 travel rules. The retrieved chunks are relevant but
       none contains the 2026 rules. UC shows the 2026 policy PDF sits in a volume that isn't part of the indexed corpus. What fixes it?
     options:
+      - 'Raise num_results to 50 so the chunks with the 2026 rules are included'
+      - 'Enable the reranker so chunks that mention 2026 rules are moved to the top'
       - 'Add the authoritative 2026 policy source to the governed corpus that feeds the index'
-      - 'Enable hybrid search'
-      - 'Enable the reranker'
-      - 'Raise num_results to 50'
-    answer: [A]
+      - 'Switch to hybrid search so that the year "2026" is matched as a keyword in the retrieved chunks'
+    answer: [C]
     explain: >-
       Low sufficiency with relevant-but-incomplete chunks means a coverage gap: the content isn't in the index. Ranking changes
       can't retrieve what was never indexed.
@@ -240,12 +243,12 @@ questions:
       Before deploying an agent, a team must ensure it can only retrieve from authoritative assets, although the catalog holds many
       derived and sandbox copies. Which TWO measures belong in the strategy?
     options:
-      - 'Build the agent''s indexes and Genie spaces only from assets tagged `system.certification_status = certified`'
       - 'Grant the agent''s identity SELECT only on the authoritative schema, not on derived or sandbox schemas'
-      - 'Add "use only authoritative sources" to the system prompt and rely on it'
       - 'Let the agent search all catalogs and rerank by date'
       - 'Delete every derived table in the workspace'
-    answer: [A, B]
+      - 'Add "use only authoritative sources" to the system prompt and rely on it'
+      - 'Build the agent''s indexes and Genie spaces only from assets tagged `system.certification_status = certified`'
+    answer: [A, E]
     explain: >-
       Restrict the retrieval space at the source and enforce it with permissions. A prompt instruction isn't enforcement, and deleting
       all derived data is neither necessary nor realistic.
@@ -255,10 +258,10 @@ questions:
     q: >-
       Which sequence correctly builds a RAG pipeline over a UC-governed corpus?
     options:
-      - 'Docs in a UC volume → parse (e.g. ai_parse_document) → chunk with metadata into a Delta table with Change Data Feed → Delta Sync AI Search index → retriever tool → chunks injected with source citations'
-      - 'Docs in a UC volume → Direct Access index → parse → chunk → retriever tool'
-      - 'Docs in a UC volume → embed whole files → Lakebase → system prompt'
-      - 'Docs in a UC volume → Genie space → retriever tool'
+      - 'UC volume → parse → chunk with metadata into a Delta table with CDF → Delta Sync index → retriever tool'
+      - 'UC volume → Direct Access index over the raw files → parse and chunk at query time → retriever tool → cited chunks'
+      - 'UC volume → Genie space over the files → Genie as a retriever tool → chunks injected with citations'
+      - 'UC volume → embed each whole file → store the vectors in Lakebase → insert the closest files into the system prompt'
     answer: [A]
     explain: >-
       The Delta Sync index needs a Delta source with CDF (and a primary key). Parsing and chunking happen before indexing, and the
@@ -269,11 +272,11 @@ questions:
     q: >-
       How should retrieved chunks be injected into the agent's context to reduce prompt-injection risk and support citations?
     options:
-      - 'Clearly delimited as data (e.g. tagged blocks) with source metadata, and an instruction to treat them as reference material, not instructions'
-      - 'Appended to the system prompt as new instructions'
-      - 'Mixed into the user''s message without markers'
-      - 'Only as embedding vectors'
-    answer: [A]
+      - 'Appended to the system prompt, so the model gives the retrieved text the same authority as its instructions'
+      - 'Delimited as data with source metadata, and marked as reference material, not instructions'
+      - 'Merged into the user''s message without markers, so the model reads the question and evidence as one text'
+      - 'Summarized by a second model first, with the source names removed so the answer reads as one voice'
+    answer: [B]
     explain: >-
       Delimiting retrieved text as data and attaching sources keeps instructions and evidence separate and enables citations.
 
@@ -283,11 +286,11 @@ questions:
       A user asks an operations agent: "Cancel the late ones." Which context elements are required to scope and execute the task
       correctly?
     options:
-      - 'The resolved entities from the session (which orders are "the ones"), the definition of "late", the user''s identity and permission to cancel, and the cancel tool'
-      - 'The full order history of all customers'
-      - 'A long description of the company''s history'
-      - 'Every tool on the MCP server'
-    answer: [A]
+      - 'Every tool on the MCP server and the full order history, so the agent can choose any action that might apply'
+      - 'The full order history of all customers, so the agent can determine which orders are late'
+      - 'The resolved orders, the definition of "late", the user''s identity and permission, and the cancel tool'
+      - 'The company''s cancellation policy document and the user''s last five sessions, loaded up front'
+    answer: [C]
     explain: >-
       The agent needs resolved intent and entities, the business rule, identity and permissions, and the right tool. Broad dumps add
       noise and risk.
@@ -298,11 +301,11 @@ questions:
       A Direct Access index still returns passages from documents that were deleted from the source system last month. The ingestion
       job only calls `upsert()` for new and changed documents. What is the root cause?
     options:
-      - 'Direct Access indexes are managed by your code, and deletions were never sent (no delete calls)'
-      - 'The reranker is caching old passages'
-      - 'The index is in TRIGGERED mode and needs a sync'
-      - 'The embedding model is outdated'
-    answer: [A]
+      - 'The embedding model is outdated, so the old passages still score as the closest matches'
+      - 'Direct Access indexes change only through your code, and no deletes were sent'
+      - 'The index is in TRIGGERED mode and needs a sync to pick up the deletions from the source'
+      - 'The reranker caches passages from previous queries and keeps returning them after deletion'
+    answer: [B]
     explain: >-
       With Direct Access you manage upserts and deletes yourself. A Delta Sync index would propagate deletes from the source table.
 
@@ -312,11 +315,11 @@ questions:
       The top 5 retrieved chunks are often five near-identical copies of the same paragraph, because the same policy is stored in
       several documents. What fixes the signal quality most directly?
     options:
-      - 'Deduplicate documents/chunks at ingestion (and keep only the authoritative copy)'
-      - 'Increase num_results to 20'
-      - 'Switch to continuous sync'
-      - 'Increase chunk overlap'
-    answer: [A]
+      - 'Increase num_results to 20 so other relevant chunks appear after the copies'
+      - 'Enable hybrid search so keyword matching separates the copies from other chunks'
+      - 'Increase chunk overlap so each copy gets merged with the text around it'
+      - 'Deduplicate at ingestion, keeping only the authoritative copy'
+    answer: [D]
     explain: >-
       Duplicates crowd out other relevant chunks. Removing them at ingestion fixes the cause; more results just add more copies.
 
@@ -326,11 +329,11 @@ questions:
       An agent queries a table with a column `st` holding values `A`, `C`, `P`. It keeps misinterpreting them. What is the
       highest-impact metadata fix?
     options:
+      - 'Add three few-shot examples to the agent''s prompt showing how each status code is used'
+      - 'Rename the column to `status` so the model can infer the meaning of the codes from the name'
+      - 'Add a sample question for each status so users ask about statuses the way Genie expects'
       - 'Add a column comment listing what each code means (A = active, C = closed, P = pending)'
-      - 'Add three few-shot examples to the agent''s prompt'
-      - 'Create a sample question for each status'
-      - 'Increase the model''s context window'
-    answer: [A]
+    answer: [D]
     explain: >-
       Describing coded values in UC metadata fixes every consumer (agents, Genie) at once.
 
@@ -339,11 +342,11 @@ questions:
     q: >-
       Which is a typical drawback of pre-inference (up-front) retrieval for a multi-part, vague user request?
     options:
-      - 'The single query may retrieve chunks for the wrong part of the request, and the fixed top-k fills the context even when not useful'
-      - 'It always requires a reranker'
-      - 'It can''t use Unity Catalog permissions'
-      - 'It makes every request slower than an agentic loop'
-    answer: [A]
+      - 'Pre-inference retrieval bypasses Unity Catalog permissions, because chunks are fetched before the agent runs'
+      - 'One query on the raw request may miss parts of it, while the fixed top-k fills the context anyway'
+      - 'Pre-inference retrieval can''t use a reranker, so the best chunks for each part are often missed'
+      - 'Pre-inference retrieval always makes requests slower than an agentic loop, because it runs before the model'
+    answer: [B]
     explain: >-
       Up-front retrieval runs once on the raw question. Vague or multi-part requests benefit from the agent retrieving step by step.
 
@@ -352,10 +355,10 @@ questions:
     q: >-
       Users need precise matches on short passages but the LLM needs surrounding context to answer correctly. Which strategy fits?
     options:
-      - 'Parent-child chunking: embed small child chunks, return the larger parent section'
-      - 'Very large chunks only'
-      - 'Very small chunks only'
-      - 'No chunking'
+      - 'Parent-child chunking: embed small child chunks and return their larger parent section'
+      - 'Sentence-level chunks with 50% overlap, so each match carries part of its neighbours'
+      - 'Small chunks only, with a higher top-k so neighbouring chunks are usually retrieved too'
+      - 'Large chunks only, so each retrieved chunk already contains the surrounding context'
     answer: [A]
     explain: >-
       Small chunks match precisely; returning the parent gives the model enough context.
@@ -366,11 +369,11 @@ questions:
       A team needs index updates within seconds of source changes for a fraud-alert knowledge base, on a standard endpoint. Which
       sync configuration fits, and what is the tradeoff?
     options:
-      - 'Continuous sync: lowest latency, but higher cost because the pipeline runs constantly'
-      - 'Triggered sync: lowest latency and lowest cost'
-      - 'Direct Access with no writes'
-      - 'Drop and recreate the index every minute'
-    answer: [A]
+      - 'Triggered sync on a frequent schedule: both the lowest latency and the lowest cost for fast-changing data'
+      - 'Recreate the index every minute from the source table, which guarantees it is always current'
+      - 'Direct Access with a nightly batch upsert job, which avoids sync costs and keeps latency low'
+      - 'Continuous sync: the lowest latency, but higher cost because the sync pipeline runs all the time'
+    answer: [D]
     explain: >-
       Continuous sync (standard endpoints) gives seconds of latency at higher cost. Triggered sync is cheaper and fits daily or batch
       updates.
@@ -381,11 +384,11 @@ questions:
       Traces show a support agent retrieved an internal-only salary guideline for an external customer. Which governance action most
       directly resolves this?
     options:
-      - 'Enforce access at retrieval: on-behalf-of-user auth or a separate index for external audiences, with UC permissions on the source'
-      - 'Add "don''t share internal documents" to the prompt'
-      - 'Enable the reranker'
-      - 'Lower num_results'
-    answer: [A]
+      - 'Lower num_results so fewer documents, and therefore fewer internal ones, reach the agent''s context'
+      - 'Enable the reranker so internal documents rank below public documents for customer questions'
+      - 'Add an instruction to the system prompt that internal documents must never be shared with external customers'
+      - 'Enforce access at retrieval: on-behalf-of-user auth or a separate index for external users'
+    answer: [D]
     explain: >-
       This is a permission gap. Retrieval must only reach what the requester may see; prompts don't enforce access.
 
@@ -395,11 +398,11 @@ questions:
       A support Genie space must answer "how many open tickets does customer X have?" for any customer, with a verified answer. Which
       object fits best?
     options:
+      - 'A sample question "How many open tickets does ACME have?" that users can adapt for other customers'
       - 'A parameterized example SQL query with the customer as a parameter, registered as a trusted asset'
-      - 'One static example query per customer'
-      - 'A general instruction describing the tickets table'
-      - 'A sample question "How many open tickets does ACME have?"'
-    answer: [A]
+      - 'A general instruction describing the tickets table and how to count open tickets per customer'
+      - 'One example SQL query per customer, each registered as a trusted asset for that customer'
+    answer: [B]
     explain: >-
       Parameterized queries generalize across values and give verified answers when used. One query per customer doesn't scale.
 
@@ -409,11 +412,11 @@ questions:
       Two tables, `customers_v1` (deprecated, still populated) and `customers` (authoritative), both appear in a Genie space. Answers
       sometimes use the deprecated one. Which change has the highest impact?
     options:
-      - 'Remove the deprecated table from the space and tag it deprecated in UC (tag the authoritative one certified)'
-      - 'Add a column synonym on `customers`'
-      - 'Add a sample question using `customers`'
-      - 'Increase the instruction count'
-    answer: [A]
+      - 'Add a sample question that uses `customers`, so users steer Genie towards the right table'
+      - 'Add column synonyms on `customers` so Genie matches more questions to the authoritative table'
+      - 'Add a general instruction telling Genie to prefer `customers` whenever both tables could answer'
+      - 'Remove the deprecated table from the space, and tag the two tables deprecated / certified in UC'
+    answer: [D]
     explain: >-
       Remove the wrong source from the space and mark status in UC. Leaving both in scope invites confusion.
 
@@ -422,10 +425,44 @@ questions:
     q: >-
       What does a Delta Sync AI Search index require on its source table?
     options:
-      - 'Change Data Feed enabled and a primary key column'
-      - 'A Direct Access endpoint'
-      - 'Liquid clustering on the text column'
-      - 'A Lakebase synced table'
-    answer: [A]
+      - 'Liquid clustering on the text column, and a timestamp column'
+      - 'Change Data Feed enabled on the table, and a primary key column'
+      - 'A Lakebase synced table as the source, and a primary key column'
+      - 'A Direct Access endpoint attached to the table, and a vector column'
+    answer: [B]
     explain: >-
       Delta Sync uses Change Data Feed to pick up inserts, updates and deletes, and needs a primary key to identify each row.
+
+  - id: d3-31
+    objective: Govern what enters the agent's context (PII handling and policy enforcement in Unity Catalog)
+    q: >-
+      MLflow traces show a support agent's RETRIEVER spans returning chunks that contain customers' personal phone numbers. The chunks
+      come from a Delta Sync index built over a ticket-history table. Which action most directly stops personal data from entering
+      the agent's context?
+    options:
+      - 'Add an instruction to the system prompt that the agent must never repeat phone numbers or other personal data in its answers'
+      - 'Mask or remove the PII in the pipeline before chunking, re-index from the cleaned table, and apply column masks on the source'
+      - 'Enable the reranker so chunks without personal data rank above the chunks that contain phone numbers for most queries'
+      - 'Add a column mask to the source table and keep the existing index, since masks also apply to text already embedded'
+    answer: [B]
+    explain: >-
+      The PII is in the indexed text, so it must be removed before chunking and the index rebuilt from the cleaned data; masks or ABAC
+      policies on the source keep it out of future queries. A column mask doesn't clean text already copied into an index, a prompt
+      rule leaves the data in the context, and reranking only changes the order.
+
+  - id: d3-32
+    objective: Govern what enters the agent's context (PII handling and policy enforcement in Unity Catalog)
+    q: >-
+      A governance team must ensure that every table containing email addresses is masked for agents and Genie spaces, across
+      hundreds of tables, including tables created next month. Which approach scales best?
+    options:
+      - 'Write a column mask function and attach it by hand to each email column, reviewing new tables in a monthly audit'
+      - 'Add a general instruction to every Genie space and a system-prompt rule to every agent forbidding email addresses'
+      - 'Use data classification to tag email columns with a governed tag, and an ABAC policy that masks columns with that tag'
+      - 'Copy every table into a separate schema without email columns and point all agents and spaces to the copies'
+    answer: [C]
+    explain: >-
+      Data classification finds and tags sensitive columns, and an ABAC policy on the governed tag applies the mask to every matching
+      column, including new ones. Manual masks don't scale, prompt rules don't enforce anything, and stripped copies create the
+      derived duplicates that §3.9 warns against.
+

@@ -54,7 +54,7 @@ terms:
   - {term: Working memory, section: d4, def: "What's in the context window right now: current messages, tool results, scratchpad."}
   - {term: Session (short-term) memory, section: d4, def: "The state of one conversation thread, persisted so it can continue or resume. LangGraph checkpointer keyed by thread_id; Databricks agent sessions."}
   - {term: Long-term memory, section: d4, def: "Durable facts, preferences and decisions reused across sessions, scoped by user/team. LangGraph store (DatabricksStore) or Databricks agent memory."}
-  - {term: Episodic / semantic / procedural memory, section: d4, def: "What happened (sessions), facts, and how to do things. Databricks calls the session store episodic and the long-term store derived memory."}
+  - {term: Episodic / semantic / procedural memory, section: d4, def: "Memory research names for what happened (sessions), facts, and how to do things. Databricks docs use short-term (one session) and long-term (across sessions) instead."}
   - {term: Lakebase, section: d4, def: "Databricks' managed Postgres (OLTP) database, governed by Unity Catalog. Low-latency row reads/writes for agent checkpoints, memories and state."}
   - {term: Checkpointer, section: d4, def: "LangGraph component that saves graph state per thread. On Lakebase: CheckpointSaver / AsyncCheckpointSaver (databricks-langchain), built on PostgresSaver / AsyncPostgresSaver."}
   - {term: AsyncPostgresSaver setup, section: d4, def: "checkpointer = AsyncPostgresSaver(pool); await checkpointer.setup(); graph = builder.compile(checkpointer=checkpointer). setup() is a coroutine and must be awaited."}

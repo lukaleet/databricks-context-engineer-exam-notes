@@ -11,43 +11,43 @@ scenarios:
     steps:
       - q: What fixes complaint (1)?
         options:
-          - A durable checkpointer on Lakebase (e.g. CheckpointSaver), with the front end sending the same thread id per conversation
-          - A long-term memory store namespaced by user
-          - A bigger context window
-          - Compaction every 10 turns
-        answer: [A]
+          - 'A larger context window, so the deployment can reload the whole conversation in one request'
+          - 'A durable Lakebase checkpointer, with the same thread id sent per conversation'
+          - 'A long-term memory store namespaced by user, so each conversation can be rebuilt from stored facts'
+          - 'Compaction every 10 turns, so the latest summary survives when the serving container restarts'
+        answer: [B]
         explain: Session state lived in process memory. A durable checkpointer keyed by thread id survives restarts.
       - q: What fixes complaint (2)?
         options:
-          - Write the contact preference to a long-term store namespaced by the verified customer id and recall it at session start
-          - Keep one thread per customer forever
-          - Add the question to the system prompt
-          - Increase top-k in AI Search
+          - 'Write the preference to a long-term store keyed by verified customer id; recall it at session start'
+          - 'Add the contact-preference question to the system prompt so the agent asks it once, early in each chat'
+          - 'Keep a single thread per customer forever, so the answer from the first chat is always in the history'
+          - 'Increase top-k in AI Search so the customer''s earlier answer is retrieved along with the policy chunks'
         answer: [A]
         explain: Cross-session preferences belong in long-term memory, scoped by trusted identity.
       - q: What fixes complaint (3)?
         options:
-          - Resolve intent with the session context (rewrite to "switch the roaming add-on to the cheaper option") before retrieval
-          - Retrieve both phone plans and add-ons every time
-          - Fine-tune the model on add-on questions
-          - Add a reranker after retrieval
-        answer: [A]
+          - 'Retrieve both phone plans and roaming add-ons on every turn, and let the model choose between them'
+          - 'Resolve intent from the session ("the cheaper roaming add-on") before retrieval'
+          - 'Add a reranker after retrieval so add-on documents rank above phone-plan documents for this query'
+          - 'Fine-tune the model on add-on questions so it recognizes them without the session context'
+        answer: [B]
         explain: The answers are accurate but mismatched to the context, so intent must be resolved before retrieval.
       - q: The memory search returns the top 20 memories with no threshold. Which change addresses complaint (4)?
         options:
-          - Lower k, add a relevance threshold and recency weighting, and consolidate outdated memories
-          - Raise k to 40
-          - Load all memories statically at session start
-          - Remove the checkpointer
-        answer: [A]
+          - 'Remove the checkpointer so that only long-term memories are used to build the context'
+          - 'Lower k, add a relevance threshold and recency weighting, consolidate old memories'
+          - 'Raise k to 40 so the current preference is always included alongside the older ones'
+          - 'Load all memories statically at session start so the model can weigh them all together'
+        answer: [B]
         explain: This is over-retrieval (context pollution). Retrieve fewer, more relevant, up-to-date memories.
       - q: Where must the namespace's customer id come from?
         options:
-          - The authenticated request context, set in application code
-          - The model's extraction from the chat
-          - A random id per session
-          - The customer's first message
-        answer: [A]
+          - 'A new random id generated at the start of each session'
+          - 'The model, extracting the customer''s id from the chat'
+          - 'The customer number typed into the customer''s first message'
+          - 'The authenticated request context, set by application code'
+        answer: [D]
         explain: Scope comes from trusted context; never let the model choose whose memory it reads or writes.
 
   - id: s2
@@ -61,42 +61,42 @@ scenarios:
     steps:
       - q: Where should compaction be triggered?
         options:
-          - Before the measured knee, around 65–70% of the window
-          - At 100% of the window
-          - After every turn
-          - Never; switch to a bigger model
-        answer: [A]
+          - 'At 100% of the window, so compaction runs as rarely as possible'
+          - 'At 90% as now, but with a model that has a larger window'
+          - 'Before the measured knee, at around 65–70% of the window'
+          - 'After every turn, so the context is always a fresh summary'
+        answer: [C]
         explain: Quality already drops at 70%; compacting at 90% means working in the degraded zone.
       - q: Which category did the compaction lose?
         options:
-          - The user's constraints, exclusions and preferences
-          - Raw tool outputs
-          - Small talk
-          - The system prompt
-        answer: [A]
+          - 'The progress list of companies already screened'
+          - 'The raw tool outputs from the research steps'
+          - 'The identifiers of the companies under review'
+          - 'The user''s constraints, exclusions and preferences'
+        answer: [D]
         explain: Recommending an excluded company after compaction shows that the constraints were dropped.
       - q: Which revision fixes it without significantly increasing tokens?
         options:
-          - Add a deduplicated list of constraints, exclusions and preferences (and decisions with reasons) to the compaction prompt
-          - Append every user message verbatim
-          - Include all tool outputs
-          - Include the chain-of-thought of every step
-        answer: [A]
+          - 'Include the outputs of all tool calls in the summary so every finding can be re-checked against the rules'
+          - 'Add a deduplicated list of constraints, exclusions and preferences to the compaction prompt'
+          - 'Include the agent''s chain-of-thought from each step so the reasons behind every recommendation are kept'
+          - 'Append every user message verbatim to the summary so that nothing the user said can be lost again'
+        answer: [B]
         explain: Add the missing category compactly. The other options fix recall at a large token cost.
       - q: How should the team tune the new prompt?
         options:
-          - Maximize recall first on real traces, then remove superfluous content while checking downstream success in MLflow
-          - Make it as short as possible first, then add back what breaks
-          - Tune it on one short synthetic conversation
-          - Ask the model whether the summary is good
-        answer: [A]
+          - 'Ask the model after each compaction whether the summary is complete, and revise when it says no'
+          - 'Maximize recall on real traces first, then trim, checking downstream success each time'
+          - 'Make the prompt as short as possible first, then add back each category whose loss breaks the task'
+          - 'Tune it on one short synthetic conversation that contains every category, then deploy it unchanged'
+        answer: [B]
         explain: Recall first, then precision, measured by whether the agent still completes the task.
       - q: Someone suggests replacing compaction with "keep the last 40 messages". Why is that worse here?
         options:
-          - The constraints were stated in turn 3 and stay relevant, so recency-based trimming would drop them
-          - Trimming is always more expensive than compaction
-          - Trimming can't be used with tool calls
-          - It isn't worse
+          - 'The constraints were stated in turn 3 and stay relevant, so recency-based trimming would drop them'
+          - 'It isn''t worse: 40 messages comfortably cover a session, so the constraints would survive trimming'
+          - 'Trimming can''t be combined with tool calls, because every tool call must keep its earlier context'
+          - 'Trimming is always more expensive than compaction, because it has to rerun tool calls afterwards'
         answer: [A]
         explain: The relevance pattern isn't recency-local, so trimming is insufficient.
 
@@ -111,43 +111,43 @@ scenarios:
     steps:
       - q: Which objects should the space keep?
         options:
-          - The certified gold tables (and views over them); remove the bronze table and the sandbox copy
-          - All nine tables, for coverage
-          - Only the sandbox copy, because analysts update it
-          - The bronze table, because it has the most columns
-        answer: [A]
+          - 'The gold tables plus the bronze table, because the bronze table has the most columns'
+          - 'The sandbox copy instead of the gold table, because analysts update it more frequently'
+          - 'The certified gold tables; remove the bronze table and the sandbox copy'
+          - 'All nine tables, so that Genie has every possible source available for each question'
+        answer: [C]
         explain: Curate a small set of authoritative objects. Raw and duplicated derived tables invite wrong answers.
       - q: Where should "bps" and "the rates desk" be defined?
         options:
-          - In the general instructions (domain vocabulary)
-          - In sample questions
-          - In the table names
-          - In a trusted asset per possible question
-        answer: [A]
+          - 'In the table and column names, renamed to match'
+          - 'In the general instructions, as domain vocabulary'
+          - 'In one trusted asset per question that uses them'
+          - 'In sample questions written in the team''s phrasing'
+        answer: [B]
         explain: Vocabulary is global context. Sample questions don't teach Genie.
       - q: How should "net exposure" get one consistent definition?
         options:
-          - An SQL expression (measure) named net_exposure with synonyms
-          - A longer general instruction with examples
-          - A sample question
-          - A hidden column
+          - 'An SQL expression (measure) named net_exposure, with synonyms'
+          - 'A sample question that shows users how to ask for net exposure'
+          - 'A longer general instruction with worked examples of the calculation'
+          - 'Hiding the columns that Genie uses in the wrong calculations'
         answer: [A]
         explain: SQL expressions encode metrics as code that Genie applies consistently.
       - q: How do you fix the name-based join?
         options:
-          - Declare PK/FK constraints in Unity Catalog (which become join relationships)
-          - Add a sample question about counterparties
-          - Hide the name column in all tables
-          - Increase the warehouse size
-        answer: [A]
+          - 'Add a sample question about counterparties that shows the right join on id'
+          - 'Declare PK/FK constraints in Unity Catalog (they become join relationships)'
+          - 'Add a general instruction saying positions must be joined on counterparty id'
+          - 'Hide the name column in both tables so Genie can''t use it as a join key'
+        answer: [B]
         explain: Join relationships come from PK/FK metadata (or defined in the knowledge store).
       - q: How do you satisfy the regulator's verified-answer requirement?
         options:
-          - Register the approved query as a parameterized example query or UC function (trusted asset)
-          - Add a general instruction describing the report
-          - Pin a sample question
-          - Increase the instruction count
-        answer: [A]
+          - 'Add a general instruction that describes the report and tells Genie to always use that logic'
+          - 'Register the approved query as a parameterized example query or UC function (trusted asset)'
+          - 'Pin a sample question for the daily report so users always ask it in the approved wording'
+          - 'Define the report''s figures as SQL expressions so Genie computes them consistently every day'
+        answer: [B]
         explain: Trusted assets produce responses marked as verified.
 
   - id: s4
@@ -161,42 +161,42 @@ scenarios:
     steps:
       - q: Which approach reduces tool tokens per call most?
         options:
-          - Progressive disclosure, staged as catalog → discovery by intent → one schema → scoped result
-          - Compressing every description to one word
-          - Loading all schemas and ranking them afterwards
-          - A bigger context window
-        answer: [A]
+          - 'Loading all 60 schemas, then ranking them with a classifier before the model chooses'
+          - 'A larger context window, so all 60 schemas fit without crowding the conversation'
+          - 'Progressive disclosure: catalog → discovery by intent → one schema → scoped result'
+          - 'Compressing every tool description to a few words while still loading all 60 schemas'
+        answer: [C]
         explain: Only the selected tool's schema enters the context.
       - q: What causes the agent to confuse the four order tools?
         options:
-          - Their descriptions overlap completely, and none states what it returns or when to use it
-          - There are too few order tools
-          - The tool names are too long
-          - The model's temperature is too low
+          - 'Their descriptions overlap completely, and none says what it returns or when to use it'
+          - 'There are too many order tools for the model to remember, so it picks one at random'
+          - 'The tool names are too similar in length, so the model can''t tell them apart by name'
+          - 'The model''s temperature is too low, so it keeps repeating its first choice for any order'
         answer: [A]
         explain: Identical descriptions make the tools indistinguishable. Rewrite them with distinct capability descriptors, or merge them.
       - q: What should `orders_search` return?
         options:
-          - Only the needed fields and a default limit (with filters and pagination), or an aggregate
-          - All 500 full records so nothing is missed
-          - Only the first record
-          - Nothing; the model can read the database directly
-        answer: [A]
+          - 'Only the first full record, since most questions are about a single order'
+          - 'All 500 records, with the result cleared from the context on the next turn'
+          - 'All 500 full records, so the agent never has to call the tool a second time'
+          - 'Only the needed fields with a default limit, or an aggregate'
+        answer: [D]
         explain: Tool result scoping is a proactive context strategy.
       - q: What should happen to the 5k tokens of rare procedures?
         options:
-          - Package them as Agent Skills, with metadata in the baseline and bodies loaded on demand
-          - Leave them in the system prompt
-          - Delete them
-          - Load every skill body at startup
+          - 'Package them as Agent Skills: metadata in the baseline, bodies loaded on demand'
+          - 'Delete them, since the rare tasks can be escalated to a human when they occur'
+          - 'Leave them in the system prompt but move them to the end, after the core rules'
+          - 'Package them as Agent Skills and load every skill body at the start of each chat'
         answer: [A]
         explain: Skills keep the baseline small without losing the capabilities.
       - q: Deep in a long session, which tool output is safe to clear?
         options:
-          - An old `orders_search` result whose findings were already summarized
-          - The confirmation id from `create_return_label`
-          - The result the agent is currently using
-          - The user's uploaded receipt
+          - 'An old `orders_search` result whose findings were already summarized'
+          - 'The confirmation id returned by `create_return_label` a few turns ago'
+          - 'The tool result that the agent is reasoning about in the current turn'
+          - 'The receipt that the user uploaded and is still asking questions about'
         answer: [A]
         explain: Clear old, digested, re-fetchable outputs only.
 
@@ -212,35 +212,35 @@ scenarios:
     steps:
       - q: Why did the first results disagree?
         options:
-          - Sub-agents got only task messages, without the coordinator's decisions, so each made its own implicit decisions
-          - The regions really have different churn
-          - The sub-agents use different models
-          - The index is stale
-        answer: [A]
+          - 'The regions really have different churn behaviour, so differing definitions are to be expected'
+          - 'The AI Search index is stale, so each sub-agent retrieved a different version of the definitions'
+          - 'The sub-agents run on different models, which interpret "active customer" in different ways'
+          - 'Sub-agents got only task messages, without the coordinator''s decisions, so each made its own'
+        answer: [D]
         explain: Missing shared context leads to conflicting implicit decisions.
       - q: Which fix doesn't expand each sub-agent's context window?
         options:
-          - Attach a compressed summary of the coordinator's trace (definitions, constraints, format) to each dispatch
-          - Attach the full 20-turn transcript to each dispatch
-          - Let each sub-agent interview the VP
-          - Use one sub-agent per column
-        answer: [A]
+          - 'Attach the coordinator''s full 20-turn transcript to each dispatch so nothing agreed with the VP is lost'
+          - 'Attach a compressed summary of the coordinator''s trace (definitions, constraints) to each dispatch'
+          - 'Let each sub-agent interview the VP directly before it starts, so it hears the definitions first-hand'
+          - 'Split the work into one sub-agent per column, so each one has a single, narrow definition to apply'
+        answer: [B]
         explain: A summary shares the decisions in a few hundred tokens.
       - q: How do you fix the coordinator's saturation?
         options:
-          - Sub-agents return condensed structured results plus a handle to the full table
-          - Truncate transcripts to 2,000 characters
-          - Give the coordinator a bigger model
-          - Remove the sub-agents' outputs
+          - 'Sub-agents return condensed, structured results plus a handle to the full table'
+          - 'Have the coordinator summarize each transcript as it arrives and discard the original'
+          - 'Give the coordinator a larger model so the four 25k-token transcripts fit comfortably'
+          - 'Truncate each transcript to its first 2,000 characters before it reaches the coordinator'
         answer: [A]
-        explain: Condensed returns and references keep the coordinator's context small but complete.
+        explain: Condensed returns and references keep the coordinator's context small but complete. Summarizing on arrival still loads every full transcript first, and truncation loses information arbitrarily.
       - q: All regions now agree but show stale numbers, and their retrieved context cites old values. Root cause?
         options:
-          - A shared stale source (the AI Search index wasn't synced after the correction)
-          - The dispatch messages lack the trace summary
-          - The sub-agents' windows are too small
-          - Boundaries are too fine
-        answer: [A]
+          - 'The agent boundaries are too fine, so the correction is lost at each handoff'
+          - 'The dispatch messages still lack the compressed trace summary of the decisions'
+          - 'The sub-agents'' windows are too small to hold the corrected regional figures'
+          - 'A shared stale source: the AI Search index wasn''t synced after the correction'
+        answer: [D]
         explain: Consistent but stale outputs point to a common source problem, not to missing shared context.
 
   - id: s6
@@ -254,41 +254,41 @@ scenarios:
     steps:
       - q: What is the governance fix for the sandbox citations?
         options:
-          - Certify the authoritative table, deprecate the copy, rebuild the index from certified sources only, and revoke access to the sandbox schema
-          - Add "prefer official documents" to the prompt
-          - Enable the reranker
-          - Switch to continuous sync
-        answer: [A]
+          - 'Switch to continuous sync so the index always reflects the latest version of every source table'
+          - 'Enable the reranker so chunks from the authoritative table outrank those from the sandbox copy'
+          - 'Add "prefer official HR documents over copies" to the system prompt and re-run the evaluation'
+          - 'Certify the source, deprecate the copy, re-index from certified data only, revoke sandbox access'
+        answer: [D]
         explain: Remove derived data from the retrieval space through UC, not through the prompt.
       - q: The 2026 rules PDF sits in a volume that isn't part of the corpus. What does the low sufficiency call for?
         options:
-          - Add the authoritative 2026 source to the governed corpus feeding the index
-          - Use hybrid search
-          - Raise num_results
-          - Lower the chunk size
+          - 'Add the authoritative 2026 source to the governed corpus that feeds the index'
+          - 'Use hybrid queries so the year 2026 is matched exactly in the existing chunks'
+          - 'Raise num_results so chunks with the 2026 rules are included in the context'
+          - 'Lower the chunk size so the 2026 rules are split out of the older passages'
         answer: [A]
         explain: A coverage gap can't be fixed by ranking.
       - q: How do you get exact hits on `HR-117`?
         options:
-          - Hybrid queries (vector + keyword)
-          - A bigger embedding model
-          - Continuous sync
-          - Sentence-level chunks
-        answer: [A]
+          - 'A larger embedding model for the index'
+          - 'Hybrid queries (vector plus keyword)'
+          - 'Sentence-level chunks for policy text'
+          - 'Continuous sync on the index pipeline'
+        answer: [B]
         explain: Keyword matching handles exact codes.
       - q: How do you stop German employees getting US documents?
         options:
-          - A metadata filter on country, set from the user's trusted profile
-          - A prompt instruction to ignore US docs
-          - A larger top-k
-          - A reranker
-        answer: [A]
+          - 'A larger top-k so German documents are always among the results'
+          - 'A reranker that moves German documents above the US documents'
+          - 'A system-prompt instruction to ignore documents about US benefits'
+          - 'A metadata filter on country, set from the user''s trusted profile'
+        answer: [D]
         explain: Filters keep irrelevant documents out of the retrieval space.
       - q: What's the cost-effective sync setup for weekly updates?
         options:
-          - Keep TRIGGERED and call sync right after the Monday update job
-          - Switch to CONTINUOUS
-          - Recreate the index daily
-          - Use a Direct Access index
-        answer: [A]
+          - 'Replace it with a Direct Access index and upsert on Mondays'
+          - 'Keep TRIGGERED and call sync right after the Monday update job'
+          - 'Drop and recreate the index every night from the source table'
+          - 'Switch the index to CONTINUOUS so updates appear within seconds'
+        answer: [B]
         explain: Sync when the data changes, no more often.

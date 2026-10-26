@@ -128,7 +128,7 @@ Loading every skill body up front defeats the purpose, and dropping the capabili
 
 | Kind | What | Example URL / notes |
 |---|---|---|
-| **Managed** MCP servers | hosted by Databricks over your governed assets | `/api/2.0/mcp/functions/{catalog}/{schema}` (UC functions), `/api/2.0/mcp/vector-search/{catalog}/{schema}` (AI Search), `/api/2.0/mcp/genie/{space_id}`, DBSQL |
+| **Managed** MCP servers | hosted by Databricks over your governed assets | `/api/2.0/mcp/functions/{catalog}/{schema}/{function}` (UC functions), `/api/2.0/mcp/ai-search/{catalog}/{schema}/{index}` (AI Search; older docs: `vector-search`), `/api/2.0/mcp/genie/{space_id}`. Newer **Unity Gateway** MCP services live at `/ai-gateway/mcp-services/system.ai.<name>` (e.g. `system.ai.dbsql`) |
 | **External** MCP servers | third-party servers reached through a **UC connection** (credentials stored in UC, managed OAuth) | GitHub, web search… |
 | **Custom** MCP servers | your own server hosted as a **Databricks App** | proprietary APIs |
 

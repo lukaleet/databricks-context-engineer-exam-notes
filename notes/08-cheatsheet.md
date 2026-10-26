@@ -45,6 +45,7 @@ Each row is **symptom → root cause → the answer the exam wants** (and the te
 | Long chunks never match their ending | chunk > embedding window (truncated) → smaller chunks | bigger LLM |
 | Mixed docs, no headings, broad + narrow queries | **recursive splitter 512–1,024 tokens, 10–15 % overlap** | whole-doc or sentence chunks |
 | Retrieves from derived/sandbox copies | **certify** authoritative, **deprecate** derived, index only certified, restrict grants | prompt to prefer official docs |
+| Retrieved chunks expose PII | mask/remove PII **before indexing**, re-index; column masks / ABAC on the source | prompt "never reveal personal data" |
 | Wrong columns picked by agent / Genie | **column descriptions** in UC | more example SQL |
 | Wrong joins | **PK/FK** constraints → join relationships | instructions describing joins |
 | Task data changes every minute / need emerges mid-task | **just-in-time** retrieval via tools | pre-inference retrieval |

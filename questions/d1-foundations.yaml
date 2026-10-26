@@ -7,11 +7,11 @@ questions:
       history. Its final answer correctly cites the current policy but also applies a deductible amount that appears only in the
       previous claimant's conversation. Which failure mode is this?
     options:
-      - 'Context confusion: superfluous content in the context was used to produce a low-quality answer'
-      - 'Context poisoning: a hallucination entered the context and was referenced repeatedly'
-      - 'Context distraction: the context grew so long that the model ignored its training'
       - 'Context clash: the system prompt contradicted the retrieved policy'
-    answer: [A]
+      - 'Context poisoning: a hallucinated deductible entered the context and was referenced repeatedly in the answer'
+      - 'Context confusion: superfluous content in the context was used to produce a low-quality answer'
+      - 'Context distraction: the context grew so long that the model ignored its training'
+    answer: [C]
     explain: >-
       The leaked content is correct for another claimant, just irrelevant here, and the model used it. That is confusion.
       Poisoning needs an error or hallucination that gets reused; clash needs two contradicting pieces of context; distraction is
@@ -24,10 +24,10 @@ questions:
       step 3 said 40 units. In steps 9, 14 and 22 it re-reads its notes and keeps routing orders away from warehouse B. Which failure
       mode is this?
     options:
-      - 'Context poisoning'
-      - 'Context confusion'
-      - 'Context clash'
-      - 'Context distraction'
+      - 'Context poisoning: an error entered the agent''s own notes and is re-read and reused in every later step'
+      - 'Context distraction: the notes made the context so long that the model stopped reasoning and repeated earlier actions'
+      - 'Context clash: the step-3 tool result and the notes contradict each other, so the model flips between the two values'
+      - 'Context confusion: the step-3 tool result is superfluous content that the model mixed into its routing decisions'
     answer: [A]
     explain: >-
       An error entered the context (the agent's own notes) and is referenced repeatedly, which is the definition of poisoning.
@@ -40,11 +40,11 @@ questions:
       to customers who mention a competitor." Across identical test conversations the agent sometimes offers the discount and
       sometimes refuses. Which failure mode is this?
     options:
-      - 'Context clash'
-      - 'Context poisoning'
-      - 'Context distraction'
-      - 'Context confusion'
-    answer: [A]
+      - 'Context confusion: the playbook is superfluous content, and the model used it to produce a low-quality answer'
+      - 'Context poisoning: the playbook introduced a hallucinated discount rule that the agent keeps referencing in later turns'
+      - 'Context distraction: the playbook made the context so long that the model ignored what it learned during training'
+      - 'Context clash: the system prompt and the retrieved playbook contradict each other, so behaviour flips between them'
+    answer: [D]
     explain: >-
       Two pieces of context contradict each other, and the behaviour flips between them. That is clash. Resolve it by pruning or
       reconciling the conflicting source and stating which instruction wins.
@@ -56,11 +56,11 @@ questions:
       blocked goal, it keeps repeating action sequences that appear many times earlier in its history. Which failure mode best
       describes this, and which technique addresses it most directly?
     options:
-      - 'Context distraction; summarize/compact the history so the window is short again'
-      - 'Context poisoning; fine-tune the model on successful plans'
-      - 'Context clash; add an instruction telling the agent not to repeat actions'
-      - 'Context confusion; add more tools so the agent has more options'
-    answer: [A]
+      - 'Context confusion; register additional planning tools so the agent has new options to choose from when blocked'
+      - 'Context clash; add an instruction telling the agent never to repeat an action sequence it has already tried'
+      - 'Context poisoning; fine-tune the model on successful plans so it stops reusing the failed action sequences'
+      - 'Context distraction; summarize/compact the long history so the window is short again and the agent can re-plan'
+    answer: [D]
     explain: >-
       Over-reliance on a very long history instead of reasoning from training is distraction. Summarization/compaction shortens
       the context. Adding instructions or tools grows the context further.
@@ -71,11 +71,11 @@ questions:
       A support agent has 45 tools registered. Traces show it often calls `billing_get_invoice` when users ask about delivery dates,
       and accuracy improved in a test where only 12 relevant tools were provided. Which technique most directly addresses the failure?
     options:
-      - 'Tool loadout: give the agent only the tools relevant to the request (e.g. select tools by description first)'
-      - 'Compaction of the message history'
-      - 'A larger context window model'
-      - 'Adding few-shot examples for every tool'
-    answer: [A]
+      - 'Move to a model with a larger context window so all 45 tool schemas fit comfortably alongside the conversation'
+      - 'Add a few-shot example for every tool showing a typical request, so the model learns which tool matches each intent it sees'
+      - 'Tool loadout: give the agent only the tools relevant to each request, for example by selecting tools by description first'
+      - 'Compaction: summarize the message history so the model has more attention left for choosing between the 45 tools'
+    answer: [C]
     explain: >-
       Too many tool definitions confuse tool selection. Selecting a relevant subset (tool loadout, or progressive disclosure) fixes
       it directly. Compaction doesn't change the tool list; more examples add tokens.
@@ -87,12 +87,12 @@ questions:
       returns up to 5,000 rows per call. The team wants to reduce context pressure before resorting to compaction. Which TWO changes
       are proactive strategies that do this?
     options:
-      - 'Replace the up-front documents with a retrieval tool the agent calls when it needs a policy (just-in-time retrieval)'
       - 'Scope the SQL tool: return only the needed columns, a default LIMIT, or an aggregate instead of raw rows'
       - 'Compact the conversation every 10 turns'
       - 'Switch to a model with a 1M-token window'
       - 'Clear tool results after every turn'
-    answer: [A, B]
+      - 'Replace the up-front documents with a retrieval tool the agent calls when it needs a policy (just-in-time retrieval)'
+    answer: [A, E]
     explain: >-
       Just-in-time retrieval and tool result scoping keep the window small by design. Compaction and clearing are reactive; a
       bigger window doesn't reduce pressure, it only delays the limit.
@@ -102,11 +102,11 @@ questions:
     q: >-
       Which design choice is a proactive context management strategy rather than a reactive one?
     options:
-      - 'Registering only the five tools a triage agent needs instead of the full 60-tool MCP server'
-      - 'Summarizing the history when it reaches 80% of the window'
-      - 'Dropping the oldest messages with a sliding window'
-      - 'Replacing old tool outputs with stubs when the window is nearly full'
-    answer: [A]
+      - 'Dropping the oldest messages with a sliding window once the history exceeds a fixed number of turns'
+      - 'Replacing old tool outputs with short stubs whenever the context window is close to being full'
+      - 'Registering only the five tools a triage agent needs instead of exposing the full 60-tool MCP server'
+      - 'Summarizing the message history into a structured summary whenever the context reaches 80% of the window'
+    answer: [C]
     explain: >-
       A minimal tool set reduces pressure from the first turn. The other three react to pressure that has already built up.
 
@@ -116,11 +116,11 @@ questions:
       A chat agent must load the user's conversation state at the start of every turn and append each new message, with millisecond
       latency, and resume conversations after a restart. Which Databricks product should store this state?
     options:
-      - 'Lakebase (managed Postgres), for example through a LangGraph checkpointer'
-      - 'A Delta table read with Spark on every turn'
-      - 'An AI Search index'
-      - 'MLflow experiment artifacts'
-    answer: [A]
+      - 'MLflow experiment artifacts, written as one JSON file per conversation and loaded on each turn'
+      - 'Lakebase (managed Postgres), for example through a LangGraph checkpointer keyed by the thread id'
+      - 'An AI Search index over the conversation messages, queried by similarity at the start of each turn'
+      - 'A Delta table, read with Spark at the start of every turn and appended to after each message'
+    answer: [B]
     explain: >-
       Per-turn reads and writes of conversation state are an OLTP workload, which is what Lakebase is for. Delta is for analytics and
       batch; AI Search is for semantic retrieval; MLflow tracks experiments and traces.
@@ -131,11 +131,11 @@ questions:
       A team wants to see, for each agent request, exactly which chunks and tool outputs entered the context, and to compare whether a
       new context configuration improved correctness across 200 test questions. Which product covers both needs?
     options:
-      - 'MLflow 3 (tracing plus mlflow.genai.evaluate and run comparison)'
-      - 'Unity Catalog lineage'
-      - 'Lakebase'
-      - 'A managed MCP server'
-    answer: [A]
+      - 'A managed MCP server: it logs every tool call the agent makes and reports which configuration was more accurate'
+      - 'MLflow 3: tracing shows what entered each request''s context, and mlflow.genai.evaluate compares configurations'
+      - 'Lakebase: store every request''s context as rows, then query correctness across the 200 questions with SQL'
+      - 'Unity Catalog lineage: it records which tables and volumes fed each request and can compare two pipeline versions'
+    answer: [B]
     explain: >-
       MLflow tracing records spans (including RETRIEVER and tool spans) per request, and MLflow evaluation compares configurations on
       a dataset. UC lineage tracks data flows, not per-request context.
@@ -146,10 +146,10 @@ questions:
       An agent must call governed SQL functions, an AI Search index and a Genie space through one standard protocol, without the team
       hosting any server code. What should they use?
     options:
-      - 'Databricks managed MCP servers'
-      - 'A custom MCP server deployed as a Databricks App'
-      - 'An external MCP server through a UC connection'
-      - 'Lakebase stored procedures'
+      - 'Databricks managed MCP servers for UC functions, AI Search and Genie, with no server code'
+      - 'An external MCP server registered through a Unity Catalog connection that proxies the three governed resources'
+      - 'Lakebase stored procedures that call the functions, the index and Genie, invoked by the agent through SQL'
+      - 'A custom MCP server deployed as a Databricks App that wraps the functions, the index and the Genie space'
     answer: [A]
     explain: >-
       Managed MCP servers expose UC functions, AI Search indexes and Genie spaces with no server code to maintain. Custom servers are
@@ -158,17 +158,19 @@ questions:
   - id: d1-11
     objective: Select the right tool in the Databricks product stack for a given scenario
     q: >-
-      Before deployment, a governance team must mark which tables are the trusted source of truth so agents and Genie prioritize them,
-      and flag outdated copies. Which product feature fits?
+      Before deployment, a governance team must mark which tables are the trusted source of truth, so that agent builders and Genie
+      space authors pick them, and flag outdated copies. Which product feature fits?
     options:
-      - 'Unity Catalog certification tags (`system.certification_status` = certified / deprecated)'
-      - 'MLflow model aliases'
-      - 'Lakebase row-level security'
-      - 'An instruction in each agent''s system prompt listing preferred tables'
-    answer: [A]
+      - 'MLflow model aliases: mark the trusted tables with a @champion alias so agents resolve them before other copies'
+      - 'Unity Catalog certification tags: the `system.certification_status` tag set to certified or deprecated on each asset'
+      - 'A list of preferred tables in each agent''s system prompt, telling it which sources to prioritize and which to avoid'
+      - 'Lakebase row-level security: hide the rows of outdated copies so agents and Genie only read the trusted tables'
+    answer: [B]
     explain: >-
-      Certification status is a governed UC tag that marks assets as certified or deprecated and surfaces in search and Genie.
-      A system-prompt list isn't governance and must be maintained in every agent.
+      Certification status is a governed UC system tag (`system.certification_status`) that marks assets as certified or deprecated; it
+      shows in Catalog Explorer and search (`certificationStatus:certified`). A list in each system prompt isn't governance, must be
+      maintained per agent, and doesn't stop anyone from using the copies. Model aliases apply to models, and row-level security hides
+      rows, not whole outdated tables.
 
   - id: d1-12
     objective: Identify which context elements are consuming disproportionate attention budget
@@ -177,11 +179,11 @@ questions:
       chunks 2,400 tokens, and the user question 40 tokens. Answers are unfocused and tool choices inconsistent. Which change is most
       likely to improve focus?
     options:
-      - 'Reduce the tool schemas to the tools relevant to the request (tool loadout / progressive disclosure)'
-      - 'Shorten the system prompt from 900 to 400 tokens'
-      - 'Remove the few-shot examples'
-      - 'Shorten the user question'
-    answer: [A]
+      - 'Remove the three few-shot examples, since examples are the most expensive tokens per unit of value'
+      - 'Shorten the system prompt from 900 to 400 tokens so the core instructions are more concentrated'
+      - 'Lower the retrieved chunks from 2,400 tokens to 800 tokens so the model sees only the top-ranked passage'
+      - 'Load only the tools relevant to each request (tool loadout or progressive disclosure)'
+    answer: [D]
     explain: >-
       Tool schemas are over 70% of the context and also the likely cause of inconsistent tool choice. Trimming the small, high-signal
       elements barely changes the budget.
@@ -192,11 +194,11 @@ questions:
       After 15 turns, 70% of a research agent's context consists of raw JSON returned by a web-search tool in turns 2–9, whose
       findings the agent already summarized in later messages. Which change best improves model focus?
     options:
-      - 'Clear or summarize those old raw tool results, keeping the later messages that state the findings'
-      - 'Remove the system prompt to free space'
-      - 'Increase top-k for retrieval so the agent sees more sources'
-      - 'Add an instruction to "focus on the latest results"'
-    answer: [A]
+      - 'Add an instruction telling the agent to focus on the latest results and ignore the earlier tool output'
+      - 'Shorten the system prompt so the remaining window has more room for the raw search results'
+      - 'Increase retrieval top-k so the agent sees more sources and can cross-check the old search results'
+      - 'Clear or summarize the old raw search results, keeping the later messages that state their findings'
+    answer: [D]
     explain: >-
       The digested raw outputs are the disproportionate, low-signal element. Clearing them is the targeted fix; an instruction to
       focus adds tokens without removing the noise.
@@ -207,10 +209,10 @@ questions:
       A routing agent classifies 2 million short emails a day into five queues with clear rules. Latency and cost matter most.
       Which reasoning mode should it use?
     options:
-      - 'Standard mode (no extended thinking)'
-      - 'Extended thinking with a large budget on every request'
-      - 'Extended thinking only for emails longer than 50 words'
-      - 'Maximum reasoning effort so the classification is always right'
+      - 'Standard mode with no extended thinking, because the rules are clear'
+      - 'Extended thinking only for emails longer than 50 words, since longer emails are harder to classify'
+      - 'Extended thinking with a large budget on every request, so ambiguous emails are never misrouted'
+      - 'Maximum reasoning effort, so each classification is double-checked before the email is routed'
     answer: [A]
     explain: >-
       Simple, well-specified classification at high volume doesn't benefit from reasoning tokens, which add output cost and latency.
@@ -222,14 +224,15 @@ questions:
       step, it hits the context limit three times sooner, and the planning quality gain comes only from the first step. What is the
       best adjustment?
     options:
-      - 'Use extended thinking for the initial planning step and reduced (or no) thinking for routine tool steps'
-      - 'Keep extended thinking everywhere and switch to a model with a larger window'
-      - 'Disable tool calls so thinking has more room'
-      - 'Raise max_tokens so thinking never truncates'
-    answer: [A]
+      - 'Raise max_tokens on every step so the 8k thinking budget is never truncated before the tool call'
+      - 'Keep extended thinking on every step but compact the history every 10 steps to recover the window'
+      - 'Use extended thinking for the initial planning step and reduced or no thinking for the routine tool steps'
+      - 'Keep extended thinking on every step and move to a model with a larger context window to absorb the tokens'
+    answer: [C]
     explain: >-
-      Reasoning tokens cost output tokens and, when retained, window space. Spend them where they help (planning) and keep routine
-      steps lean.
+      Reasoning tokens are output tokens and, when kept in the history, also take window space. Spend them where they help (the planning
+      step) and keep routine steps lean. A bigger window or frequent compaction treats the symptom while still paying for thinking that
+      adds nothing, and raising max_tokens makes each step bigger, not smaller.
 
   - id: d1-16
     objective: Select the appropriate reasoning mode based on token budget constraints and context window impact
@@ -237,11 +240,11 @@ questions:
       On a Databricks Foundation Model API endpoint for a hybrid reasoning model, a developer sets
       `extra_body={"thinking": {"type": "enabled", "budget_tokens": 6000}}` and `max_tokens=4000`. What is the problem?
     options:
+      - 'Thinking can only be enabled together with `reasoning_effort="high"`, which this request does not set'
+      - 'The thinking parameter is only supported through the native SDK, not through the OpenAI-compatible client'
+      - 'Thinking tokens are not counted as output, so the budget is ignored and the model thinks without a limit'
       - '`budget_tokens` must be less than `max_tokens`, so the request is invalid'
-      - 'Thinking can only be enabled with `reasoning_effort="high"`'
-      - 'Thinking tokens are free, so the budget is ignored'
-      - 'Thinking is not supported through the OpenAI-compatible client'
-    answer: [A]
+    answer: [D]
     explain: >-
       Reasoning tokens are part of the output, so the thinking budget has to fit inside `max_tokens`. `reasoning_effort` is the
       parameter for reasoning-only models (e.g. GPT OSS), not for budget-based hybrid models.
@@ -253,10 +256,10 @@ questions:
       then falling to 0.6 by 90%, with no hard-limit errors. Conversations must stay in one session and keep earlier tool results'
       facts. What should the team do?
     options:
-      - 'Trigger compaction (structured summary plus recent messages) before ~65% of the window'
-      - 'Move to a model with twice the context window'
-      - 'Apply a sliding window that drops the oldest turns at 65%'
-      - 'Start a new session automatically at 65%'
+      - 'Trigger compaction (summary plus recent messages) before the context reaches ~65%'
+      - 'Move to a model with twice the context window so conversations stay well below the 65% point'
+      - 'Apply a sliding window that drops the oldest turns once the context reaches 65% of the window'
+      - 'Start a new session automatically at 65%, carrying over only the user''s last message'
     answer: [A]
     explain: >-
       The knee is at ~65%, so intervene before it with an approach that keeps facts. A sliding window drops facts; a new session
@@ -267,11 +270,11 @@ questions:
     q: >-
       How can a team identify where context length starts to degrade an agent's reasoning quality?
     options:
-      - 'Log context size per turn in MLflow traces, score each turn with an evaluation judge, and look for where quality drops as context grows'
-      - 'Wait for the model to return a context-length error'
-      - 'Compare the advertised context windows of several models'
-      - 'Count the number of tools registered'
-    answer: [A]
+      - 'Run the agent until the model returns a context-length error, and treat that turn as the point of degradation'
+      - 'Compare the advertised context windows of several models and set the threshold at half of the smallest one'
+      - 'Count the tools and documents loaded per turn and flag the turn where their total exceeds a fixed limit'
+      - 'Log context size per turn in MLflow traces, score each turn with a judge, and find where quality drops off'
+    answer: [D]
     explain: >-
       Degradation is measured, not assumed: quality against context fill from traces and judges shows the knee, which usually comes
       well before any hard error.
@@ -282,11 +285,11 @@ questions:
       Why is "upgrade to a model with a larger context window" usually the wrong answer when an agent mis-cites earlier tool results
       at 75% of its current window?
     options:
-      - 'Recall and reasoning degrade as context grows (context rot) well before the limit, so more room doesn''t restore focus'
-      - 'Larger-window models don''t support tool calling'
-      - 'Larger windows are not available on Databricks'
-      - 'It would shorten the conversation'
-    answer: [A]
+      - 'A larger window raises the cost of every turn so much that the session would need to be split anyway'
+      - 'Larger-window models must be fine-tuned before they can use tool results from earlier in a session'
+      - 'Larger-window models are reasoning-only models on Databricks, so they can''t be used for tool-calling agents'
+      - 'Recall degrades as context grows (context rot), well before the limit; more room doesn''t restore focus'
+    answer: [D]
     explain: >-
       The problem is diluted attention over many tokens, not running out of space. Reducing what's in the window fixes it.
 
@@ -296,11 +299,11 @@ questions:
       A coding agent explores 40 files to answer a question about a module. The exploration fills its window and its final answer
       ignores details discovered early. Which technique most directly prevents this?
     options:
-      - 'Context quarantine: delegate the exploration to a sub-agent that returns a condensed summary'
-      - 'Few-shot examples of good answers'
-      - 'Lower temperature'
-      - 'A longer system prompt describing the codebase'
-    answer: [A]
+      - 'A lower temperature, so the agent''s final answer stays closer to the evidence it collected while exploring'
+      - 'Context quarantine: a sub-agent explores and returns a condensed summary'
+      - 'Few-shot examples of good answers, so the agent learns to include details discovered early in its exploration'
+      - 'A longer system prompt describing the codebase, so the agent needs to open fewer files to find the module'
+    answer: [B]
     explain: >-
       Isolating heavy exploration in its own window and returning a short summary keeps the main context clean. The other options
       don't reduce what accumulates.
@@ -310,11 +313,11 @@ questions:
     q: >-
       Which trace evidence would distinguish context poisoning from context confusion?
     options:
-      - 'Poisoning: content in the context is wrong (e.g. a hallucinated value) and is reused; confusion: content is correct but irrelevant and gets used'
-      - 'Poisoning: the context is over 100k tokens; confusion: under 100k tokens'
-      - 'Poisoning: two instructions contradict; confusion: there is only one instruction'
-      - 'There is no difference; both are the same failure'
-    answer: [A]
+      - 'Poisoning: the model ignores its training data; confusion: the model ignores the retrieved context'
+      - 'Poisoning: two instructions contradict each other; confusion: one instruction is ambiguous and is misread'
+      - 'Poisoning: the context is longer than 100k tokens; confusion: it is shorter but holds content from several sources'
+      - 'Poisoning: wrong content (e.g. hallucinated) is reused; confusion: correct but irrelevant content is used'
+    answer: [D]
     explain: >-
       Wrong-and-reused is poisoning; correct-but-irrelevant-and-used is confusion. Contradiction is clash; length is distraction.
 
@@ -324,11 +327,11 @@ questions:
       Early in a session an agent made a wrong assumption about the user's region and built several steps on it. Even after the user
       corrected it, the agent keeps drifting back to the wrong region. Which intervention most directly restores correct behaviour?
     options:
-      - 'Prune the outdated assumption and the steps built on it, and continue from a consolidated context that states the correction'
-      - 'Add the correction as one more message and continue'
-      - 'Increase the temperature'
-      - 'Add more few-shot examples about regions'
-    answer: [A]
+      - 'Raise the temperature so the agent is less anchored to the reasoning it produced earlier in the session'
+      - 'Prune the wrong assumption and the steps built on it, and continue from a consolidated context'
+      - 'Add the user''s correction as one more message and continue, since the most recent message takes precedence'
+      - 'Add few-shot examples about regions so the model learns to check the user''s region before planning steps'
+    answer: [B]
     explain: >-
       An early wrong turn left in the context clashes with the correction, and models often don't recover. Removing the outdated
       content (pruning / restarting from consolidated state) is the direct fix.
@@ -339,11 +342,11 @@ questions:
       Business users ask an agent ad-hoc questions about sales figures stored in curated UC tables ("revenue by region last
       quarter"). Which component should the agent use to answer them?
     options:
-      - 'A Genie space over the curated tables (e.g. as a tool or sub-agent)'
-      - 'An AI Search index over the table rows'
-      - 'Lakebase long-term memory'
-      - 'A system prompt containing last quarter''s numbers'
-    answer: [A]
+      - 'Lakebase long-term memory, so figures from earlier answers can be reused in later sessions'
+      - 'A Genie space over the curated tables, exposed to the agent as a tool or as a sub-agent'
+      - 'A system prompt that includes last quarter''s figures by region, refreshed after each close'
+      - 'An AI Search index over the table rows, so the agent can retrieve the most similar records'
+    answer: [B]
     explain: >-
       Natural-language questions over structured tables are Genie's job (text to SQL over governed tables). Embedding rows or
       hard-coding numbers gives approximate or stale answers.
@@ -354,11 +357,11 @@ questions:
       A system prompt includes 14 few-shot examples, 11 of which demonstrate the same "look up order status" path. Which change best
       reduces attention spent on low-value tokens without hurting coverage?
     options:
-      - 'Keep one or two order-status examples plus the examples covering other paths, and drop the redundant ones'
-      - 'Drop all 14 examples'
-      - 'Move all 14 examples to the end of the prompt'
-      - 'Duplicate the examples covering rare paths so they have more weight'
-    answer: [A]
+      - 'Move all 14 examples to the end of the prompt so they compete less with the instructions'
+      - 'Drop all 14 examples, since the instructions should describe every tool path the agent needs'
+      - 'Duplicate the examples for the rare paths so they carry as much weight as the order-status ones'
+      - 'Keep one or two order-status examples plus those covering other paths; drop the rest'
+    answer: [D]
     explain: >-
       Redundant examples cost tokens without adding coverage. Keep diverse examples that cover distinct paths.
 
@@ -367,10 +370,10 @@ questions:
     q: >-
       Which is an example of tool result scoping?
     options:
-      - 'A `get_customer` tool that returns only name, tier and open-ticket count instead of the full 200-field customer record'
-      - 'Clearing a tool result 20 turns later'
-      - 'Summarizing the whole history every 30 turns'
-      - 'Calling the same tool twice to verify the result'
+      - 'A `get_customer` tool that returns only name, tier and open-ticket count, not all 200 fields'
+      - 'Calling `get_customer` twice and keeping only the result that matches across both calls'
+      - 'Summarizing the whole history, including every tool result, once the session reaches 30 turns'
+      - 'Replacing the result of a `get_customer` call with a short stub 20 turns after it was returned'
     answer: [A]
     explain: >-
       Scoping limits what the tool returns in the first place: only the needed fields, rows, or an aggregate.
@@ -381,11 +384,11 @@ questions:
       A customer-facing agent summarizes the conversation every 20 turns. One summary misstates the customer's account number. In the
       following 40 turns, every lookup uses the wrong account number. What should the team change?
     options:
-      - 'Treat it as poisoning: validate identifiers before writing them into summaries (or copy them verbatim from tool results), and correct the poisoned summary'
-      - 'Increase the summary frequency to every 10 turns'
-      - 'Switch to a sliding window so summaries aren''t needed'
-      - 'Add a rule "double-check account numbers"'
-    answer: [A]
+      - 'Add a rule to the system prompt telling the agent to double-check account numbers before every lookup'
+      - 'Treat it as poisoning: copy identifiers verbatim into summaries, validate them, and fix the bad summary'
+      - 'Summarize more often, every 10 turns instead of 20, so a wrong value is replaced sooner by a fresh summary'
+      - 'Replace summarization with a sliding window so no summary can introduce values that weren''t in the history'
+    answer: [B]
     explain: >-
       A wrong value entered the context via the summary and is reused: poisoning. Prevent it at the source (verbatim identifiers,
       validation) and fix the bad entry.
@@ -396,11 +399,11 @@ questions:
       A contract-analysis agent answers a few complex questions per day. Each requires weighing several clauses, exceptions and
       dates, and wrong answers are costly. Token cost is not a concern. Which mode fits best?
     options:
-      - 'Extended thinking with an adequate budget'
-      - 'Standard mode to minimize latency'
-      - 'Reduced thinking to save tokens'
-      - 'No model call; use keyword search only'
-    answer: [A]
+      - 'Standard mode with a longer system prompt that lists the clause exceptions the model should check'
+      - 'Standard mode, because a few questions a day don''t justify extra latency and the clauses are retrieved anyway'
+      - 'Reduced thinking, because a small budget is enough when the relevant clauses are already in the context'
+      - 'Extended thinking with an adequate budget, because the questions are rare, hard and costly to get wrong'
+    answer: [D]
     explain: >-
       Hard multi-constraint reasoning at low volume, where quality matters most, is the use case for extended thinking.
 
@@ -411,9 +414,9 @@ questions:
       Which option fits the exam's Databricks stack?
     options:
       - 'A Lakebase-backed long-term store with embeddings (e.g. DatabricksStore), namespaced by user'
-      - 'The MLflow Prompt Registry'
-      - 'A Unity Catalog volume of text files read at every turn'
-      - 'The agent''s system prompt, edited by hand'
+      - 'A Unity Catalog volume with one text file per user, read in full at the start of every turn'
+      - 'The MLflow Prompt Registry, with one prompt version per user that holds that user''s preferences'
+      - 'The agent''s system prompt, with a preferences section for each user that is edited when they change'
     answer: [A]
     explain: >-
       Long-term memory across sessions belongs in a durable store keyed by user and searchable by meaning; on Databricks that is

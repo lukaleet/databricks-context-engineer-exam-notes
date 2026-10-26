@@ -151,6 +151,9 @@ client.chat.completions.create(
 client.chat.completions.create(model="databricks-gpt-oss-120b", messages=msgs, reasoning_effort="low")
 ```
 
+Newer Claude models on Databricks (e.g. Claude Opus 5.5) use **adaptive** thinking with an **effort** level instead of a fixed
+`budget_tokens`, and reject a manual budget. The idea the exam tests is the same: spend reasoning tokens only where they pay off.
+
 > **Exam pattern:** a long-running agent hits the window limit sooner after someone turned on extended thinking with a large budget
 > on every step → reduce the thinking budget / effort (or enable it only on planning steps), don't buy a bigger window.
 

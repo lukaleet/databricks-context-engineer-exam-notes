@@ -7,11 +7,11 @@ questions:
       means hours between `arrived_at` and `departed_at`, and "the northern hub" isn't recognized as `hub_id = 'N1'`. The tables
       already have good column descriptions. What is the most direct fix?
     options:
-      - 'Define the team''s vocabulary in the general instructions (or as SQL expressions with those names and synonyms)'
-      - 'Add sample questions that use the words "dwell time" and "northern hub"'
-      - 'Rename the columns to dwell_time and northern_hub in the source tables'
-      - 'Add every possible question as a trusted asset'
-    answer: [A]
+      - 'Register a trusted asset for every question that mentions dwell time or the northern hub, with verified SQL'
+      - 'Define the team''s vocabulary in general instructions (or as named SQL expressions with synonyms)'
+      - 'Add sample questions that use "dwell time" and "the northern hub", so Genie learns the team''s phrasing'
+      - 'Rename the source columns to dwell_time and northern_hub so Genie can match the terms to columns directly'
+    answer: [B]
     explain: >-
       Domain vocabulary is context Genie needs on every question: general instructions (or a named SQL expression for a computable
       metric/filter). Sample questions are starter prompts for users and don't teach Genie terminology.
@@ -21,11 +21,11 @@ questions:
     q: >-
       What is the purpose of sample questions in a Genie space?
     options:
-      - 'They are starter prompts shown to business users to help them begin a conversation'
-      - 'They train Genie on the team''s domain vocabulary'
-      - 'They become trusted assets that return verified answers'
-      - 'They define join relationships between tables'
-    answer: [A]
+      - 'They are stored as trusted assets, so questions that match them return answers marked as verified'
+      - 'They train Genie on the team''s domain vocabulary, which it then applies when interpreting new questions'
+      - 'They tell Genie which tables to join for common questions, alongside the join relationships in the space'
+      - 'They are starter prompts shown to business users in the chat, to help them begin a conversation with the space'
+    answer: [D]
     explain: >-
       Sample questions help users get started. Verified answers come from trusted assets (parameterized example queries and UC
       functions); vocabulary goes in instructions or the knowledge store.
@@ -36,14 +36,16 @@ questions:
       Regulators require that the "liquidity coverage ratio" question always be answered with an approved query, and users must be
       able to tell the answer is verified. What should the Genie space author add?
     options:
-      - 'A parameterized example SQL query (or a UC SQL function) as a trusted asset for that question'
-      - 'A general instruction describing how to compute the ratio'
-      - 'A sample question "What is the liquidity coverage ratio?"'
-      - 'A column synonym "LCR" on the ratio column'
-    answer: [A]
+      - 'A general instruction that spells out the approved formula and tells Genie to always apply it for this ratio'
+      - 'A parameterized example SQL query (or a UC SQL function) for that question, registered as a trusted asset'
+      - 'An SQL expression of type measure for the ratio, with "LCR" as a synonym, so Genie computes it one way'
+      - 'A sample question "What is the liquidity coverage ratio?" so users always ask it in the approved form'
+    answer: [B]
     explain: >-
-      Trusted assets produce responses marked as verified when they're used. Instructions guide generation but don't guarantee the
-      approved SQL; sample questions and synonyms don't either.
+      Trusted assets (parameterized example SQL queries and UC SQL functions) give verified answers: in chat, when the exact registered
+      query or function produces the response, Genie marks it as verified. A measure makes the calculation consistent, and an
+      instruction guides generation, but neither guarantees the approved query or shows users that the answer is verified. Sample
+      questions only help users get started.
 
   - id: d2-04
     objective: Select and validate the instructions, sample questions, and trusted SQL assets that produce a production-ready Genie space
@@ -51,11 +53,11 @@ questions:
       Genie computes "gross margin" three different ways depending on how the question is phrased. Which knowledge-store element gives
       a single, consistently applied definition?
     options:
-      - 'An SQL expression of type measure named gross_margin (with synonyms)'
-      - 'A sample question about gross margin'
-      - 'A hidden column'
-      - 'A longer general instruction listing many margin examples'
-    answer: [A]
+      - 'Hiding the cost columns that Genie uses inconsistently, so only one margin calculation is possible'
+      - 'A sample question about gross margin, so users ask it in the phrasing Genie handles correctly'
+      - 'A longer general instruction that lists several worked examples of how gross margin is calculated'
+      - 'An SQL expression of type measure named gross_margin, with its synonyms, in the space''s knowledge store'
+    answer: [D]
     explain: >-
       SQL expressions (measures, filters, fields) define business metrics as code that Genie applies as written, which is more
       consistent than prose instructions.
@@ -63,19 +65,20 @@ questions:
   - id: d2-05
     objective: Justify which few-shot examples to include or exclude based on their marginal contribution to agent performance
     q: >-
-      An agent has budget for three few-shot examples. Candidates: (1) a simple order-status lookup, (2) another order-status lookup
-      with a different id, (3) an ambiguous request where the agent asks a clarifying question, (4) an example showing the required
-      JSON output with a `citations` array, (5) a refund request using the `issue_credit` tool that no instruction covers. Which three
-      add the most marginal value?
+      An agent has budget for three few-shot examples. Its instructions already handle order-status lookups well. Candidates: (1) a
+      simple order-status lookup, (2) another order-status lookup with a different id, (3) an ambiguous request where the agent asks a
+      clarifying question, (4) an example showing the required JSON output with a `citations` array, (5) a refund request using the
+      `issue_credit` tool that no instruction covers. Which three add the most marginal value?
     options:
-      - '3, 4 and 5'
       - '1, 2 and 4'
-      - '1, 2 and 3'
       - '1, 4 and 5'
-    answer: [A]
+      - '1, 2 and 3 (to reinforce the most common path)'
+      - '3, 4 and 5'
+    answer: [D]
     explain: >-
-      Keep examples that cover an untested tool path (5), demonstrate the output structure (4), and handle ambiguous input (3). The
-      second order-status example is redundant; the first covers a path the model already handles from instructions.
+      Keep examples that cover an untested tool path (5), demonstrate the output structure (4), and handle ambiguous input (3). Both
+      order-status examples cover a path the instructions already handle, so they add little; repeating the common path doesn't
+      reinforce anything useful, it just costs tokens.
 
   - id: d2-06
     objective: Justify which few-shot examples to include or exclude based on their marginal contribution to agent performance
@@ -83,11 +86,11 @@ questions:
       After adding a few-shot example in which the answer mentions "Berlin warehouse", the agent starts mentioning Berlin in unrelated
       answers. What is the best revision?
     options:
-      - 'Vary the surface details across examples (or replace the specific value) so the model copies the pattern, not the content'
-      - 'Add a rule "never mention Berlin"'
-      - 'Remove all few-shot examples'
-      - 'Repeat the example three times so the model understands it'
-    answer: [A]
+      - 'Remove all few-shot examples and describe the expected answer format in the instructions instead'
+      - 'Add a rule to the system prompt telling the agent never to mention Berlin unless the user asks about it'
+      - 'Vary the surface details across examples so the model copies the pattern, not the content'
+      - 'Repeat the example several times with the same wording so the model understands it is only an illustration'
+    answer: [C]
     explain: >-
       Models over-imitate example content. Diverse, canonical examples fix the cause. A rule against one city patches one symptom
       and adds tokens.
@@ -98,11 +101,11 @@ questions:
       A system prompt says "ALWAYS escalate to a human if the customer is unhappy." The agent now escalates on mild phrases like "a bit
       annoying", flooding the human queue. Which revision fixes this with the least added cost?
     options:
-      - 'Scope the rule and give its reason: escalate when the customer asks for a human or reports a safety, legal or billing dispute, because agents can''t resolve those'
-      - 'Add 20 examples of unhappy and not-unhappy messages'
-      - 'Add a second rule: "NEVER escalate unless really necessary"'
-      - 'Remove the escalation rule entirely'
-    answer: [A]
+      - 'Remove the escalation rule and let the model decide case by case when a human needs to take over'
+      - 'Scope the rule and give its reason: escalate only for explicit requests or safety, legal or billing disputes'
+      - 'Add about 20 few-shot examples of unhappy and not-unhappy messages so the model learns where the line is'
+      - 'Add a second rule, "NEVER escalate unless it is really necessary", to balance the first one'
+    answer: [B]
     explain: >-
       The rule over-triggers because it's absolute and unscoped. A scoped principle with a reason is the smallest fix. A contradictory
       second rule creates clash; removing it loses needed behaviour; 20 examples cost many tokens.
@@ -113,10 +116,10 @@ questions:
       A system prompt has 60 lines of "if the user asks X, respond with Y" rules. The agent handles exactly those phrasings but fails
       on slight variations, and the team adds new rules weekly. What is the best revision strategy?
     options:
-      - 'Replace the enumerated rules with the underlying principles and a few diverse examples'
-      - 'Add more rules for every new variation observed'
-      - 'Move the rules into the user message'
-      - 'Increase temperature so the agent generalizes'
+      - 'Replace the enumerated rules with the underlying principles plus a few diverse, canonical examples'
+      - 'Raise the temperature so the model generalizes beyond the exact phrasings in the rules'
+      - 'Keep adding a rule for each new variation, grouped by topic so the list stays manageable'
+      - 'Move the rules from the system prompt into each user message so they are closer to the question'
     answer: [A]
     explain: >-
       Over-specified if-then prompts are brittle and costly to maintain. The right altitude is principles plus a few canonical examples.
@@ -127,11 +130,11 @@ questions:
       A system prompt contains the current product price list (updated weekly by hand). Users report outdated prices. Which revision
       resolves this with the least ongoing maintenance?
     options:
-      - 'Remove the price list from the prompt and give the agent a tool or retrieval source that reads current prices'
-      - 'Update the prompt daily instead of weekly'
-      - 'Add an instruction "prices may be outdated"'
-      - 'Add the previous price list too, so the agent can compare'
-    answer: [A]
+      - 'Add an instruction that prices may be outdated and that users should confirm them with sales'
+      - 'Keep the price list in the prompt but update it daily through a scheduled job instead of weekly by hand'
+      - 'Replace the price list with a tool or retrieval source that reads current prices'
+      - 'Add the previous week''s price list as well, so the agent can tell users which prices changed'
+    answer: [C]
     explain: >-
       Dynamic data doesn't belong in static instructions. Fetching it just in time removes the maintenance and the staleness.
 
@@ -141,11 +144,11 @@ questions:
       In one MLflow experiment, prompt A (1,200 tokens) scores correctness 0.86; prompt B (3,900 tokens) scores 0.87, with equal
       safety and groundedness. The agent serves 3 million requests per month. What should the team conclude?
     options:
-      - 'The higher-token prompt is not justified: a one-point gain doesn''t pay for 3x the prompt tokens at this volume'
-      - 'Prompt B is better because its correctness is higher'
-      - 'Prompt B is justified because more context always helps'
-      - 'Neither can be judged without a larger context window'
-    answer: [A]
+      - 'Justified: prompt B has the higher correctness score, and safety and groundedness are unchanged'
+      - 'Undecidable: the two prompts can only be compared after both are tested on a model with a larger window'
+      - 'Not justified: a one-point gain doesn''t pay for over 3x the prompt tokens at 3 million requests a month'
+      - 'Justified: more context in the prompt generally improves robustness on inputs the test set doesn''t cover'
+    answer: [C]
     explain: >-
       Compare the quality gain against the extra cost at production volume. A marginal gain for a large, recurring cost isn't
       justified.
@@ -156,11 +159,11 @@ questions:
       Prompt B adds three things to prompt A: four few-shot examples, a 2,000-token compliance appendix, and a tool-usage section.
       B scores much better. How should the engineer identify which element drives the gain?
     options:
-      - 'Run ablations in the same MLflow experiment: remove one added element at a time and compare metrics and token counts'
-      - 'Keep all three, since together they work'
-      - 'Ask the LLM which part of the prompt it used most'
-      - 'Compare the elements by their token counts alone'
-    answer: [A]
+      - 'Keep all three additions, since the experiment showed that together they produce the improvement'
+      - 'Ask the LLM to explain which part of prompt B it relied on most when answering the evaluation questions'
+      - 'Run ablations in one MLflow experiment: remove one added element at a time and compare'
+      - 'Rank the three additions by token count and keep the shortest one, since it gives the best cost ratio'
+    answer: [C]
     explain: >-
       Ablation isolates each element's contribution. Elements whose removal doesn't hurt quality are pure cost.
 
@@ -170,10 +173,10 @@ questions:
       Genie filters `state ILIKE '%California%'` when users mention California, but the column stores two-letter codes. What should
       the author enable or add?
     options:
-      - 'Prompt matching (format assistance + entity matching) on the state column'
-      - 'A sample question mentioning California'
-      - 'A general instruction listing all 50 states and their codes'
-      - 'A trusted asset for each state'
+      - 'Enable prompt matching on the state column (format assistance plus entity matching)'
+      - 'Add a sample question that mentions California so Genie sees how users refer to states'
+      - 'Register a parameterized trusted asset for each state with the code filled in'
+      - 'Add a general instruction that lists all 50 state names with their two-letter codes'
     answer: [A]
     explain: >-
       Entity matching gives Genie the column's distinct values so it maps "California" to `CA`. A 50-line instruction costs
@@ -184,12 +187,12 @@ questions:
     q: >-
       Which TWO steps validate that a Genie space is ready for production?
     options:
+      - 'Count the number of sample questions'
+      - 'Add every table in the catalog so nothing is missing'
+      - 'Check that the general instructions are longer than 2,000 words'
       - 'Run a set of benchmark questions with expected answers and check accuracy before and after each change'
       - 'Review the SQL Genie generates for representative questions, including ambiguous phrasings'
-      - 'Count the number of sample questions'
-      - 'Check that the general instructions are longer than 2,000 words'
-      - 'Add every table in the catalog so nothing is missing'
-    answer: [A, B]
+    answer: [D, E]
     explain: >-
       Benchmarks measure accuracy systematically, and reviewing generated SQL catches wrong joins or filters. More tables and longer
       instructions usually reduce quality.
@@ -200,11 +203,11 @@ questions:
       A system prompt says "Keep answers under 80 words" in the formatting section and "Always include all troubleshooting steps" in
       the support section. Answers alternate between truncated and very long. What is the targeted revision?
     options:
-      - 'Reconcile the two instructions into one rule that says when each applies (e.g. short answers, full steps only for troubleshooting requests)'
-      - 'Add a third instruction telling the model to use its judgement'
-      - 'Move the formatting section to the end of the prompt'
-      - 'Add few-shot examples of both lengths'
-    answer: [A]
+      - 'Add a third instruction telling the model to use its judgement when the two instructions disagree'
+      - 'Reconcile the two into one rule that says when each applies'
+      - 'Move the formatting section to the end of the prompt so it takes precedence over the support section'
+      - 'Add few-shot examples of both a short answer and a long troubleshooting answer to show both lengths'
+    answer: [B]
     explain: >-
       The instructions clash. Resolving the conflict at its source is the smallest change; examples and extra rules add tokens without
       removing the contradiction.
@@ -214,11 +217,11 @@ questions:
     q: >-
       Which guidance belongs in the general text instructions of a Genie space rather than in an example SQL query?
     options:
-      - 'The company''s fiscal year starts on February 1, so "Q1" means February to April'
-      - 'The exact SQL for the monthly regulatory report'
-      - 'A multi-join query for "top customers by lifetime value"'
-      - 'A parameterized query for a single store''s daily sales'
-    answer: [A]
+      - 'A multi-join query that answers "top customers by lifetime value" for any region'
+      - 'The exact SQL for the monthly regulatory report that must always be run unchanged'
+      - 'The company''s fiscal year starts on February 1, so "Q1" always means February to April'
+      - 'A parameterized query that returns a single store''s daily sales for a chosen date'
+    answer: [C]
     explain: >-
       Global context that applies to many questions (fiscal calendar, vocabulary, formatting) goes in general instructions. Specific
       question patterns go in example SQL or trusted assets.
@@ -229,11 +232,11 @@ questions:
       Prompt C (+1,500 tokens over prompt A) improves correctness from 0.71 to 0.84 on the hard subset of the evaluation set and costs
       +8% per request. The hard subset is 40% of production traffic. What is the best conclusion?
     options:
-      - 'The extra tokens are likely justified; next, ablate C''s additions to keep only the part that drives the gain'
-      - 'Not justified, because any token increase is unacceptable'
-      - 'Justified, and the team should add even more context to improve further'
-      - 'Impossible to tell without testing on a different model'
-    answer: [A]
+      - 'Can''t be judged until both prompts are also evaluated on a different foundation model as well'
+      - 'Justified, and the team should add more context in the same way to improve further'
+      - 'Not justified, because a higher per-request cost always outweighs a gain on a subset'
+      - 'Likely justified; next, ablate C''s additions and keep only the part that drives the gain'
+    answer: [D]
     explain: >-
       A large gain on a big share of traffic at a modest cost is worth it. Ablation then trims whatever part of the addition doesn't
       contribute.

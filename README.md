@@ -12,7 +12,7 @@ An interactive study guide for the **Databricks Certified Context Engineer Assoc
 | 🗺️ Visual guide: 20 diagrams of the mechanisms the exam tests (also embedded in the section notes) | [`notes/10-visual-guide.md`](notes/10-visual-guide.md), drawn by [`scripts/diagrams.py`](scripts/diagrams.py) |
 | 🩺 Symptom → fix cheat sheet, with the tempting wrong answer for each row | [`notes/08-cheatsheet.md`](notes/08-cheatsheet.md) |
 | 🌉 GenAI → Context Engineer bridge: what carries over, what's new, which product names changed | [`notes/09-genai-bridge.md`](notes/09-genai-bridge.md) |
-| ✍️ 166 exam-style scenario questions (single & multiple-selection) with explanations | [`questions/`](questions/) and the site's *Practice* page |
+| ✍️ 168 exam-style scenario questions (single & multiple-selection) with explanations | [`questions/`](questions/) and the site's *Practice* page |
 | ⏱️ Timed mock exams: 45 questions, 90 minutes, weighted by section | Site → *Mock exam* |
 | 🧩 6 multi-step scenarios (forgetful agent, long research agent, treasury Genie space, 60-tool MCP server…) | [`scenarios/`](scenarios/) and the site |
 | 🃏 Flashcards + glossary (91 terms) | Site → *Flashcards*, *Glossary* |

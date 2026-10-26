@@ -101,7 +101,7 @@ Unlike the GenAI Engineer exam (March 2026 names), this guide is from July 2026 
 
 | In this exam guide | Also called | Notes |
 |---|---|---|
-| Databricks AI Search | Vector Search (Mosaic AI Vector Search) | APIs and SQL still say `vector-search` / `vector_search()`. Python package `databricks-ai-search`, client `AISearchClient`. |
+| Databricks AI Search | Vector Search (Mosaic AI Vector Search) | The REST API and SQL still say `vector-search` / `vector_search()` (the managed MCP path is now `ai-search`). Python package `databricks-ai-search`, client `AISearchClient`. |
 | Genie space | Genie Agent (docs, from ~Oct 2026) | Same feature: NL → SQL over curated UC tables. |
 | Lakebase | Databricks managed Postgres (OLTP) | Low-latency row store used for agent memory and checkpoints. |
 | MLflow 3 | | Tracing, `mlflow.genai.evaluate`, scorers and judges, experiment comparison. |
