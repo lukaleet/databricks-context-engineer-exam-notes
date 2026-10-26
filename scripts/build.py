@@ -1,0 +1,166 @@
+#!/usr/bin/env python3
+"""Build docs/data/content.js from notes/*.md, questions/*.yaml, scenarios/*.yaml, plan/*.yaml and labs/*.py.
+
+Usage:  python3 scripts/build.py          (requires: pip install pyyaml markdown)
+Validates every question (answer letters, unique ids, "Which TWO" counts) and fails loudly.
+"""
+import glob, json, os, re, sys
+import markdown
+import yaml
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import diagrams  # noqa: E402  (scripts/diagrams.py: inline SVG figures for [[diagram:id]] markers)
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+REPO_URL = "https://github.com/lukaleet/databricks-context-engineer-exam-notes"
+SECTIONS = {
+    "d1": {"name": "Foundations of Context Engineering", "weight": 16, "mock": 7},
+    "d2": {"name": "System Prompt and Instruction Design", "weight": 9, "mock": 4},
+    "d3": {"name": "Knowledge Retrieval and Genie Configuration", "weight": 20, "mock": 9},
+    "d4": {"name": "Memory Architecture with Lakebase and MLflow", "weight": 18, "mock": 8},
+    "d5": {"name": "Tool Design, MCP, and Agent Context", "weight": 13, "mock": 6},
+    "d6": {"name": "Context Compression and Compaction", "weight": 11, "mock": 5},
+    "d7": {"name": "Multi-Agent and Long-Horizon Task Design", "weight": 13, "mock": 6},
+}
+LETTERS = "ABCDEFGH"
+NUM_WORDS = {"TWO": 2, "THREE": 3}
+errors = []
+
+
+def front_matter(text):
+    m = re.match(r"^---\n(.*?)\n---\n", text, re.S)
+    return (yaml.safe_load(m.group(1)), text[m.end():]) if m else ({}, text)
+
+
+def insert_diagrams(body, where):
+    def figure(m):
+        if m.group(1) not in diagrams.DIAGRAMS:
+            errors.append(f"{where}: unknown diagram {m.group(1)}")
+            return ""
+        return "\n" + diagrams.render(m.group(1)) + "\n"
+    return re.sub(r"^\[\[diagram:([\w-]+)\]\]$", figure, body, flags=re.M)
+
+
+def build_notes():
+    notes = []
+    for path in sorted(glob.glob(os.path.join(ROOT, "notes", "*.md"))):
+        meta, body = front_matter(open(path, encoding="utf-8").read())
+        body = insert_diagrams(body, os.path.basename(path))
+        md = markdown.Markdown(extensions=["tables", "fenced_code", "toc", "sane_lists"],
+                               extension_configs={"toc": {"toc_depth": "2-3"}})
+        html = md.convert(body)
+        notes.append({**meta, "html": html, "toc": md.toc_tokens, "file": os.path.basename(path)})
+    return notes
+
+
+def check_question(q, where):
+    qid = q.get("id", "?")
+    opts, ans = q.get("options", []), q.get("answer", [])
+    if not q.get("q") or len(opts) < 2:
+        errors.append(f"{where}:{qid} missing text/options")
+    for a in ans:
+        if a not in LETTERS[:len(opts)]:
+            errors.append(f"{where}:{qid} bad answer letter {a}")
+    if len(set(ans)) != len(ans) or not ans:
+        errors.append(f"{where}:{qid} empty/duplicate answers")
+    for word, n in NUM_WORDS.items():
+        if re.search(rf"\b{word}\b", q["q"]) and len(ans) != n:
+            errors.append(f"{where}:{qid} says {word} but has {len(ans)} answers")
+    if len(ans) > 1 and not re.search(r"\b(TWO|THREE|Select TWO|Select THREE)\b", q["q"]):
+        errors.append(f"{where}:{qid} multi-answer but question doesn't say how many")
+    return {**q, "answer": [LETTERS.index(a) for a in ans]}
+
+
+def build_questions():
+    out, ids = [], set()
+    for path in sorted(glob.glob(os.path.join(ROOT, "questions", "d*.yaml"))):
+        data = yaml.safe_load(open(path, encoding="utf-8"))
+        for q in data["questions"]:
+            if q["id"] in ids:
+                errors.append(f"duplicate id {q['id']}")
+            ids.add(q["id"])
+            out.append({**check_question(q, os.path.basename(path)), "section": data["section"]})
+    return out
+
+
+def build_scenarios():
+    data = yaml.safe_load(open(os.path.join(ROOT, "scenarios", "scenarios.yaml"), encoding="utf-8"))
+    for s in data["scenarios"]:
+        s["steps"] = [check_question({**st, "id": f"{s['id']}-{i}"}, "scenarios") for i, st in enumerate(s["steps"])]
+    return data["scenarios"]
+
+
+def build_glossary():
+    return yaml.safe_load(open(os.path.join(ROOT, "questions", "glossary.yaml"), encoding="utf-8"))["terms"]
+
+
+def build_labs():
+    labs = []
+    for path in sorted(glob.glob(os.path.join(ROOT, "labs", "*.py"))):
+        src = open(path, encoding="utf-8").read()
+        title = re.search(r"# MAGIC # (.+)", src).group(1)
+        objectives = re.findall(r"# MAGIC - (§\d .+)", src.split("COMMAND")[0])
+        meta = re.search(r"# MAGIC \*\*Time:\*\* (.+)", src)
+        name = os.path.basename(path)
+        labs.append({"file": name, "title": title, "objectives": objectives,
+                     "meta": meta.group(1) if meta else "",
+                     "url": f"{REPO_URL}/blob/main/labs/{name}",
+                     "raw": f"{REPO_URL}/raw/main/labs/{name}"})
+    return labs
+
+
+def build_plan(labs, scenarios):
+    data = yaml.safe_load(open(os.path.join(ROOT, "plan", "daily-plan.yaml"), encoding="utf-8"))
+    lab_urls = {l["file"]: l["url"] for l in labs}
+    scen_ids = {s["id"] for s in scenarios}
+    days_seen = []
+    for week in data["weeks"]:
+        for d in week["days"]:
+            days_seen.append(d["day"])
+            for i, t in enumerate(d["tasks"]):
+                t["id"] = f"day{d['day']}-{i}"
+                link = t.get("link", "")
+                if link.startswith("lab:"):
+                    if link[4:] not in lab_urls:
+                        errors.append(f"plan day {d['day']}: unknown lab {link}")
+                    t["link"], t["external"] = lab_urls.get(link[4:], ""), True
+                m = re.match(r"#/scenarios/(\w+)", link)
+                if m and m.group(1) not in scen_ids:
+                    errors.append(f"plan day {d['day']}: unknown scenario {link}")
+    if days_seen != list(range(1, len(days_seen) + 1)):
+        errors.append("plan days must be numbered 1..N in order")
+    return data["weeks"]
+
+
+def main():
+    content = {
+        "sections": SECTIONS,
+        "notes": build_notes(),
+        "questions": build_questions(),
+        "scenarios": build_scenarios(),
+        "glossary": build_glossary(),
+        "labs": build_labs(),
+        "repo": REPO_URL,
+    }
+    content["plan"] = build_plan(content["labs"], content["scenarios"])
+    if sum(s["mock"] for s in SECTIONS.values()) != 45:
+        errors.append("mock quotas must sum to 45 (the real exam's scored question count)")
+    for sid, s in SECTIONS.items():
+        n = sum(q["section"] == sid for q in content["questions"])
+        if n < s["mock"]:
+            errors.append(f"section {sid} has {n} questions < mock quota {s['mock']}")
+    errors.extend(f"diagram label overflow: {w}" for w in sorted(set(diagrams.warnings)))
+    if errors:
+        print("BUILD FAILED:\n  " + "\n  ".join(errors))
+        sys.exit(1)
+    out = os.path.join(ROOT, "docs", "data", "content.js")
+    with open(out, "w", encoding="utf-8") as f:
+        f.write("window.EXAM = " + json.dumps(content, ensure_ascii=False) + ";\n")
+    print(f"OK: {len(content['notes'])} notes, {len(content['questions'])} questions, "
+          f"{len(content['scenarios'])} scenarios, {len(content['glossary'])} terms, "
+          f"{len(content['labs'])} labs, {sum(len(w['days']) for w in content['plan'])}-day plan "
+          f"-> {os.path.relpath(out, ROOT)}")
+
+
+if __name__ == "__main__":
+    main()

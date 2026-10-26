@@ -1,0 +1,239 @@
+section: d2
+questions:
+  - id: d2-01
+    objective: Select and validate the instructions, sample questions, and trusted SQL assets that produce a production-ready Genie space
+    q: >-
+      A Genie space for a logistics team answers numeric questions correctly, but when users say "dwell time" Genie doesn't know it
+      means hours between `arrived_at` and `departed_at`, and "the northern hub" isn't recognized as `hub_id = 'N1'`. The tables
+      already have good column descriptions. What is the most direct fix?
+    options:
+      - 'Define the team''s vocabulary in the general instructions (or as SQL expressions with those names and synonyms)'
+      - 'Add sample questions that use the words "dwell time" and "northern hub"'
+      - 'Rename the columns to dwell_time and northern_hub in the source tables'
+      - 'Add every possible question as a trusted asset'
+    answer: [A]
+    explain: >-
+      Domain vocabulary is context Genie needs on every question: general instructions (or a named SQL expression for a computable
+      metric/filter). Sample questions are starter prompts for users and don't teach Genie terminology.
+
+  - id: d2-02
+    objective: Select and validate the instructions, sample questions, and trusted SQL assets that produce a production-ready Genie space
+    q: >-
+      What is the purpose of sample questions in a Genie space?
+    options:
+      - 'They are starter prompts shown to business users to help them begin a conversation'
+      - 'They train Genie on the team''s domain vocabulary'
+      - 'They become trusted assets that return verified answers'
+      - 'They define join relationships between tables'
+    answer: [A]
+    explain: >-
+      Sample questions help users get started. Verified answers come from trusted assets (parameterized example queries and UC
+      functions); vocabulary goes in instructions or the knowledge store.
+
+  - id: d2-03
+    objective: Select and validate the instructions, sample questions, and trusted SQL assets that produce a production-ready Genie space
+    q: >-
+      Regulators require that the "liquidity coverage ratio" question always be answered with an approved query, and users must be
+      able to tell the answer is verified. What should the Genie space author add?
+    options:
+      - 'A parameterized example SQL query (or a UC SQL function) as a trusted asset for that question'
+      - 'A general instruction describing how to compute the ratio'
+      - 'A sample question "What is the liquidity coverage ratio?"'
+      - 'A column synonym "LCR" on the ratio column'
+    answer: [A]
+    explain: >-
+      Trusted assets produce responses marked as verified when they're used. Instructions guide generation but don't guarantee the
+      approved SQL; sample questions and synonyms don't either.
+
+  - id: d2-04
+    objective: Select and validate the instructions, sample questions, and trusted SQL assets that produce a production-ready Genie space
+    q: >-
+      Genie computes "gross margin" three different ways depending on how the question is phrased. Which knowledge-store element gives
+      a single, consistently applied definition?
+    options:
+      - 'An SQL expression of type measure named gross_margin (with synonyms)'
+      - 'A sample question about gross margin'
+      - 'A hidden column'
+      - 'A longer general instruction listing many margin examples'
+    answer: [A]
+    explain: >-
+      SQL expressions (measures, filters, fields) define business metrics as code that Genie applies as written, which is more
+      consistent than prose instructions.
+
+  - id: d2-05
+    objective: Justify which few-shot examples to include or exclude based on their marginal contribution to agent performance
+    q: >-
+      An agent has budget for three few-shot examples. Candidates: (1) a simple order-status lookup, (2) another order-status lookup
+      with a different id, (3) an ambiguous request where the agent asks a clarifying question, (4) an example showing the required
+      JSON output with a `citations` array, (5) a refund request using the `issue_credit` tool that no instruction covers. Which three
+      add the most marginal value?
+    options:
+      - '3, 4 and 5'
+      - '1, 2 and 4'
+      - '1, 2 and 3'
+      - '1, 4 and 5'
+    answer: [A]
+    explain: >-
+      Keep examples that cover an untested tool path (5), demonstrate the output structure (4), and handle ambiguous input (3). The
+      second order-status example is redundant; the first covers a path the model already handles from instructions.
+
+  - id: d2-06
+    objective: Justify which few-shot examples to include or exclude based on their marginal contribution to agent performance
+    q: >-
+      After adding a few-shot example in which the answer mentions "Berlin warehouse", the agent starts mentioning Berlin in unrelated
+      answers. What is the best revision?
+    options:
+      - 'Vary the surface details across examples (or replace the specific value) so the model copies the pattern, not the content'
+      - 'Add a rule "never mention Berlin"'
+      - 'Remove all few-shot examples'
+      - 'Repeat the example three times so the model understands it'
+    answer: [A]
+    explain: >-
+      Models over-imitate example content. Diverse, canonical examples fix the cause. A rule against one city patches one symptom
+      and adds tokens.
+
+  - id: d2-07
+    objective: Select the targeted revision strategy that resolves a miscalibrated system prompt failure with the least increase in token cost and maintenance burden
+    q: >-
+      A system prompt says "ALWAYS escalate to a human if the customer is unhappy." The agent now escalates on mild phrases like "a bit
+      annoying", flooding the human queue. Which revision fixes this with the least added cost?
+    options:
+      - 'Scope the rule and give its reason: escalate when the customer asks for a human or reports a safety, legal or billing dispute, because agents can''t resolve those'
+      - 'Add 20 examples of unhappy and not-unhappy messages'
+      - 'Add a second rule: "NEVER escalate unless really necessary"'
+      - 'Remove the escalation rule entirely'
+    answer: [A]
+    explain: >-
+      The rule over-triggers because it's absolute and unscoped. A scoped principle with a reason is the smallest fix. A contradictory
+      second rule creates clash; removing it loses needed behaviour; 20 examples cost many tokens.
+
+  - id: d2-08
+    objective: Select the targeted revision strategy that resolves a miscalibrated system prompt failure with the least increase in token cost and maintenance burden
+    q: >-
+      A system prompt has 60 lines of "if the user asks X, respond with Y" rules. The agent handles exactly those phrasings but fails
+      on slight variations, and the team adds new rules weekly. What is the best revision strategy?
+    options:
+      - 'Replace the enumerated rules with the underlying principles and a few diverse examples'
+      - 'Add more rules for every new variation observed'
+      - 'Move the rules into the user message'
+      - 'Increase temperature so the agent generalizes'
+    answer: [A]
+    explain: >-
+      Over-specified if-then prompts are brittle and costly to maintain. The right altitude is principles plus a few canonical examples.
+
+  - id: d2-09
+    objective: Select the targeted revision strategy that resolves a miscalibrated system prompt failure with the least increase in token cost and maintenance burden
+    q: >-
+      A system prompt contains the current product price list (updated weekly by hand). Users report outdated prices. Which revision
+      resolves this with the least ongoing maintenance?
+    options:
+      - 'Remove the price list from the prompt and give the agent a tool or retrieval source that reads current prices'
+      - 'Update the prompt daily instead of weekly'
+      - 'Add an instruction "prices may be outdated"'
+      - 'Add the previous price list too, so the agent can compare'
+    answer: [A]
+    explain: >-
+      Dynamic data doesn't belong in static instructions. Fetching it just in time removes the maintenance and the staleness.
+
+  - id: d2-10
+    objective: Determine whether a higher-token configuration is justified and identify the element driving the cost-performance tradeoff
+    q: >-
+      In one MLflow experiment, prompt A (1,200 tokens) scores correctness 0.86; prompt B (3,900 tokens) scores 0.87, with equal
+      safety and groundedness. The agent serves 3 million requests per month. What should the team conclude?
+    options:
+      - 'The higher-token prompt is not justified: a one-point gain doesn''t pay for 3x the prompt tokens at this volume'
+      - 'Prompt B is better because its correctness is higher'
+      - 'Prompt B is justified because more context always helps'
+      - 'Neither can be judged without a larger context window'
+    answer: [A]
+    explain: >-
+      Compare the quality gain against the extra cost at production volume. A marginal gain for a large, recurring cost isn't
+      justified.
+
+  - id: d2-11
+    objective: Determine whether a higher-token configuration is justified and identify the element driving the cost-performance tradeoff
+    q: >-
+      Prompt B adds three things to prompt A: four few-shot examples, a 2,000-token compliance appendix, and a tool-usage section.
+      B scores much better. How should the engineer identify which element drives the gain?
+    options:
+      - 'Run ablations in the same MLflow experiment: remove one added element at a time and compare metrics and token counts'
+      - 'Keep all three, since together they work'
+      - 'Ask the LLM which part of the prompt it used most'
+      - 'Compare the elements by their token counts alone'
+    answer: [A]
+    explain: >-
+      Ablation isolates each element's contribution. Elements whose removal doesn't hurt quality are pure cost.
+
+  - id: d2-12
+    objective: Select and validate the instructions, sample questions, and trusted SQL assets that produce a production-ready Genie space
+    q: >-
+      Genie filters `state ILIKE '%California%'` when users mention California, but the column stores two-letter codes. What should
+      the author enable or add?
+    options:
+      - 'Prompt matching (format assistance + entity matching) on the state column'
+      - 'A sample question mentioning California'
+      - 'A general instruction listing all 50 states and their codes'
+      - 'A trusted asset for each state'
+    answer: [A]
+    explain: >-
+      Entity matching gives Genie the column's distinct values so it maps "California" to `CA`. A 50-line instruction costs
+      instruction budget and is less reliable.
+
+  - id: d2-13
+    objective: Select and validate the instructions, sample questions, and trusted SQL assets that produce a production-ready Genie space
+    q: >-
+      Which TWO steps validate that a Genie space is ready for production?
+    options:
+      - 'Run a set of benchmark questions with expected answers and check accuracy before and after each change'
+      - 'Review the SQL Genie generates for representative questions, including ambiguous phrasings'
+      - 'Count the number of sample questions'
+      - 'Check that the general instructions are longer than 2,000 words'
+      - 'Add every table in the catalog so nothing is missing'
+    answer: [A, B]
+    explain: >-
+      Benchmarks measure accuracy systematically, and reviewing generated SQL catches wrong joins or filters. More tables and longer
+      instructions usually reduce quality.
+
+  - id: d2-14
+    objective: Select the targeted revision strategy that resolves a miscalibrated system prompt failure with the least increase in token cost and maintenance burden
+    q: >-
+      A system prompt says "Keep answers under 80 words" in the formatting section and "Always include all troubleshooting steps" in
+      the support section. Answers alternate between truncated and very long. What is the targeted revision?
+    options:
+      - 'Reconcile the two instructions into one rule that says when each applies (e.g. short answers, full steps only for troubleshooting requests)'
+      - 'Add a third instruction telling the model to use its judgement'
+      - 'Move the formatting section to the end of the prompt'
+      - 'Add few-shot examples of both lengths'
+    answer: [A]
+    explain: >-
+      The instructions clash. Resolving the conflict at its source is the smallest change; examples and extra rules add tokens without
+      removing the contradiction.
+
+  - id: d2-15
+    objective: Select and validate the instructions, sample questions, and trusted SQL assets that produce a production-ready Genie space
+    q: >-
+      Which guidance belongs in the general text instructions of a Genie space rather than in an example SQL query?
+    options:
+      - 'The company''s fiscal year starts on February 1, so "Q1" means February to April'
+      - 'The exact SQL for the monthly regulatory report'
+      - 'A multi-join query for "top customers by lifetime value"'
+      - 'A parameterized query for a single store''s daily sales'
+    answer: [A]
+    explain: >-
+      Global context that applies to many questions (fiscal calendar, vocabulary, formatting) goes in general instructions. Specific
+      question patterns go in example SQL or trusted assets.
+
+  - id: d2-16
+    objective: Determine whether a higher-token configuration is justified and identify the element driving the cost-performance tradeoff
+    q: >-
+      Prompt C (+1,500 tokens over prompt A) improves correctness from 0.71 to 0.84 on the hard subset of the evaluation set and costs
+      +8% per request. The hard subset is 40% of production traffic. What is the best conclusion?
+    options:
+      - 'The extra tokens are likely justified; next, ablate C''s additions to keep only the part that drives the gain'
+      - 'Not justified, because any token increase is unacceptable'
+      - 'Justified, and the team should add even more context to improve further'
+      - 'Impossible to tell without testing on a different model'
+    answer: [A]
+    explain: >-
+      A large gain on a big share of traffic at a modest cost is worth it. Ablation then trims whatever part of the addition doesn't
+      contribute.

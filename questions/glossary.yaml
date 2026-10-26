@@ -1,0 +1,100 @@
+# Glossary / flashcards. section = where the term is taught.
+terms:
+  # ---- §1 Foundations
+  - {term: Context, section: d1, def: "Everything the model sees on one inference call: system prompt, tool definitions, examples, retrieved knowledge, memory, message history, tool results and other agents' outputs."}
+  - {term: Context engineering, section: d1, def: "Choosing, at every step, the smallest set of high-signal tokens that lets the model do the task. A per-turn decision, broader than prompt engineering."}
+  - {term: Attention budget, section: d1, def: "The model's finite capacity to attend to tokens. Every extra token dilutes attention for the important ones (n tokens → n² pairwise relationships)."}
+  - {term: Context rot, section: d1, def: "Recall and reasoning accuracy decline as the context grows, well before the hard limit. Bigger windows don't stop it."}
+  - {term: Lost in the middle, section: d1, def: "Information in the middle of a long context is used less reliably than information at the start or end."}
+  - {term: Context poisoning, section: d1, def: "An error or hallucination enters the context (e.g. the agent's own notes or summary) and is referenced repeatedly. Fix: remove it, validate before writing, restart from verified state."}
+  - {term: Context distraction, section: d1, def: "The context grows so long that the model over-focuses on it (repeating history) and neglects what it learned in training. Fix: compaction or shorter context."}
+  - {term: Context confusion, section: d1, def: "Superfluous content (irrelevant docs, old sessions, unneeded tools) is used to generate a low-quality response. Fix: remove it (tool loadout, scoped retrieval, pruning)."}
+  - {term: Context clash, section: d1, def: "New information or tools conflict with information already in the context, so behaviour flips. Fix: prune or reconcile and state which source wins."}
+  - {term: Tool loadout, section: d1, def: "Giving the model only the tools relevant to the current task, often by retrieving tools by their descriptions."}
+  - {term: Context quarantine, section: d1, def: "Isolating work in a separate context (e.g. a sub-agent) so its tokens don't pollute the main window."}
+  - {term: Context pruning, section: d1, def: "Removing irrelevant or outdated content from the context."}
+  - {term: Context offloading, section: d1, def: "Storing notes, plans or intermediate results outside the window (scratchpad file, state table) and reloading them when needed."}
+  - {term: Proactive context management, section: d1, def: "Design choices that keep the window small from the start: minimal tool sets, just-in-time retrieval, tool result scoping, skills, sub-agents."}
+  - {term: Reactive context management, section: d1, def: "Shrinking the context once pressure builds: tool result clearing, trimming, compaction, offloading."}
+  - {term: Tool result scoping, section: d1, def: "Designing tools to return only the needed fields, rows or aggregates (filters, LIMIT, pagination) so raw payloads never enter the context."}
+  - {term: Extended thinking, section: d1, def: "A reasoning mode where the model spends output tokens thinking before answering. Good for hard, low-volume reasoning; costly in long loops."}
+  - {term: budget_tokens, section: d1, def: "The thinking budget for hybrid reasoning models (e.g. Claude) on Databricks, passed as extra_body thinking. Must be less than max_tokens."}
+  - {term: reasoning_effort, section: d1, def: "Reasoning level (low / medium / high) for reasoning-only models such as GPT OSS and Gemini 3 on Databricks."}
+  - {term: Degradation knee, section: d1, def: "The context fill level where measured quality starts to drop. Trigger compaction or clearing before it."}
+  # ---- §2 Instructions
+  - {term: Right altitude, section: d2, def: "A system prompt specific enough to steer behaviour but general enough to let the model use judgement. Not brittle if-then rules, not vague platitudes."}
+  - {term: Over-triggering, section: d2, def: "An absolute or shouted rule (ALWAYS, MUST) applied in situations where it shouldn't be. Fix: scope the rule and give the reason."}
+  - {term: Few-shot marginal value, section: d2, def: "Keep an example only if it covers an untested tool path, demonstrates the output structure, or shows how to handle ambiguous input. Drop redundant ones."}
+  - {term: Prompt ablation, section: d2, def: "Removing one prompt element at a time and re-running the evaluation to see which element drives quality and which is just cost."}
+  - {term: General instructions (Genie), section: d2, def: "Plain-text global context for a Genie space: domain vocabulary, fiscal calendar, formatting and clarification rules. Keep them few and organized."}
+  - {term: Sample questions (Genie), section: d2, def: "Starter prompts shown to business users. They don't teach Genie terminology or logic."}
+  - {term: SQL expressions (Genie), section: d2, def: "Named measures, filters and fields (dimensions) that define business terms as SQL, applied consistently. Live in the knowledge store."}
+  - {term: Trusted asset, section: d2, def: "A parameterized example SQL query or UC SQL function in a Genie space. Responses produced with it are marked as verified. Users need EXECUTE on functions."}
+  - {term: Knowledge store, section: d2, def: "A Genie space's curated semantic layer: table/column descriptions and synonyms, hidden columns, prompt matching, join relationships, SQL expressions. Up to 200 snippets."}
+  - {term: Entity matching, section: d2, def: "Genie prompt matching that stores distinct values of string columns (up to 120 columns) so 'Florida' maps to 'FL'."}
+  - {term: Benchmarks (Genie), section: d2, def: "Saved questions with expected answers used to measure a Genie space's accuracy before and after changes."}
+  # ---- §3 Retrieval
+  - {term: Pre-inference retrieval, section: d3, def: "Embed the question and insert top-k chunks before the model runs. One fast pass; suits stable corpora and self-contained questions."}
+  - {term: Just-in-time retrieval, section: d3, def: "The agent calls retrieval tools (AI Search, Genie, SQL on Delta, UC functions) during the task, loading data only when needed."}
+  - {term: AI Search, section: d3, def: "Databricks' vector/hybrid/full-text search service, formerly Vector Search. Package databricks-ai-search, client AISearchClient; REST paths still say vector-search."}
+  - {term: Delta Sync index, section: d3, def: "AI Search index synced from a Delta table. Needs Change Data Feed and a primary key; propagates inserts, updates and deletes."}
+  - {term: Direct Access index, section: d3, def: "AI Search index you write to yourself with upsert/delete calls; no automatic sync."}
+  - {term: Triggered vs continuous sync, section: d3, def: "Triggered updates the index only when sync() runs (cheap; run it after ingestion). Continuous syncs within seconds at higher cost (standard endpoints)."}
+  - {term: Hybrid search, section: d3, def: "query_type='HYBRID': vector similarity plus keyword matching, fused with Reciprocal Rank Fusion. Fixes misses on exact codes and identifiers."}
+  - {term: Reranker, section: d3, def: "A second-stage model (DatabricksReranker, columns_to_rerank) that reorders retrieved candidates by relevance. Fixes 'right chunk retrieved but ranked low'."}
+  - {term: Reciprocal Rank Fusion (RRF), section: d3, def: "Combines rankings by summing 1/(k + rank) across lists; used by hybrid search."}
+  - {term: Recursive character splitter, section: d3, def: "Splits on the largest separator (paragraph → line → sentence → word) that keeps chunks under a target size. Default choice for unstructured, mixed-length text (~512–1,024 tokens, 10–15% overlap)."}
+  - {term: Parent-child chunking, section: d3, def: "Embed small child chunks for precise matching, return the larger parent section to the model."}
+  - {term: Embedding context length, section: d3, def: "The maximum tokens an embedding model reads; longer chunks are silently truncated (e.g. 512 for bge-large-en, 8,192 for gte-large-en)."}
+  - {term: system.certification_status, section: d3, def: "Governed UC tag with values certified / deprecated, marking trusted and outdated assets (tables, views, volumes, functions, models, Genie spaces...)."}
+  - {term: Authoritative source, section: d3, def: "The owned, certified source of truth for a dataset, as opposed to derived copies, sandboxes and staging tables."}
+  - {term: RetrievalSufficiency, section: d3, def: "MLflow judge checking whether retrieved context contains everything needed for the expected answer (needs ground truth). Low = coverage gap."}
+  - {term: RETRIEVER span, section: d3, def: "The MLflow trace span that records which chunks (and sources) a retriever returned, i.e. what entered the context."}
+  # ---- §4 Memory
+  - {term: Working memory, section: d4, def: "What's in the context window right now: current messages, tool results, scratchpad."}
+  - {term: Session (short-term) memory, section: d4, def: "The state of one conversation thread, persisted so it can continue or resume. LangGraph checkpointer keyed by thread_id; Databricks agent sessions."}
+  - {term: Long-term memory, section: d4, def: "Durable facts, preferences and decisions reused across sessions, scoped by user/team. LangGraph store (DatabricksStore) or Databricks agent memory."}
+  - {term: Episodic / semantic / procedural memory, section: d4, def: "What happened (sessions), facts, and how to do things. Databricks calls the session store episodic and the long-term store derived memory."}
+  - {term: Lakebase, section: d4, def: "Databricks' managed Postgres (OLTP) database, governed by Unity Catalog. Low-latency row reads/writes for agent checkpoints, memories and state."}
+  - {term: Checkpointer, section: d4, def: "LangGraph component that saves graph state per thread. On Lakebase: CheckpointSaver / AsyncCheckpointSaver (databricks-langchain), built on PostgresSaver / AsyncPostgresSaver."}
+  - {term: AsyncPostgresSaver setup, section: d4, def: "checkpointer = AsyncPostgresSaver(pool); await checkpointer.setup(); graph = builder.compile(checkpointer=checkpointer). setup() is a coroutine and must be awaited."}
+  - {term: thread_id, section: d4, def: "The key a checkpointer uses to load and save a conversation: config={'configurable': {'thread_id': ...}}. Sent to deployed agents in custom_inputs."}
+  - {term: DatabricksStore, section: d4, def: "databricks-langchain LangGraph store on Lakebase with semantic search (embedding_endpoint, embedding_dims). put/get/search by namespace tuple."}
+  - {term: Memory namespace, section: d4, def: "The tuple that scopes memories, e.g. ('memories', user_id). user_id must come from trusted request context. LangGraph labels can't contain periods."}
+  - {term: State object, section: d4, def: "A durable table (Delta or Lakebase) holding exact task progress, needed when work spans many items, runs, agents or must be auditable."}
+  - {term: Static memory retrieval, section: d4, def: "Loading a fixed set of memories at session start. Predictable but costs tokens every call and risks pollution."}
+  - {term: Dynamic memory retrieval, section: d4, def: "The agent queries memory when needed. Relevant and fresh, but can miss history if it doesn't ask."}
+  - {term: Over-retrieval, section: d4, def: "Too many or irrelevant memories enter the context (context pollution). Fix: lower k, thresholds, recency weighting, consolidation."}
+  - {term: Under-retrieval, section: d4, def: "Needed history isn't retrieved (never written, k too low, bad query). The agent re-asks or contradicts past decisions."}
+  - {term: Intent resolution, section: d4, def: "A stage before retrieval that uses session context to resolve references and rewrite the query. Fixes 'accurate but contextually mismatched' answers."}
+  - {term: Memory pipeline, section: d4, def: "Databricks Beta feature that distills sessions into long-term memories (distill → merge → maintain), on demand or about every 24h."}
+  - {term: Parallel coordinates chart, section: d4, def: "MLflow run-comparison chart with one axis per metric/param. Shows which run stays high on every metric at once."}
+  - {term: DatabricksLakebase resource, section: d4, def: "MLflow resource declared when logging an agent that uses a Lakebase database, so the deployed endpoint gets credentials automatically."}
+  # ---- §5 Tools
+  - {term: Progressive disclosure (tools), section: d5, def: "Loading tool information in stages: catalog → discovery by intent → full schema of the chosen tool → scoped execution result."}
+  - {term: Raw tool dump, section: d5, def: "Loading every tool's full schema into every call. Costly and causes confusion with many tools."}
+  - {term: Capability descriptor, section: d5, def: "Distinct metadata stating what a tool returns, its scope and when to use it, so discovery can tell similar tools apart."}
+  - {term: Context-efficient execution, section: d5, def: "Filtering, aggregating or joining tool output in code before it reaches the model."}
+  - {term: Tool result clearing, section: d5, def: "Replacing old, digested, re-fetchable tool outputs with short stubs. The lightest compaction."}
+  - {term: Agent Skill, section: d5, def: "A folder with SKILL.md (name + description front matter, instructions) and optional files. Metadata always loaded, body on demand, files when needed."}
+  - {term: Managed MCP server, section: d5, def: "Databricks-hosted MCP endpoint over UC functions, AI Search indexes, Genie spaces or DBSQL; no server code to run."}
+  - {term: External MCP server, section: d5, def: "A third-party MCP server reached through a UC connection with stored credentials."}
+  - {term: Custom MCP server, section: d5, def: "Your own MCP server hosted as a Databricks App."}
+  - {term: UC function as a tool, section: d5, def: "A SQL/Python function in Unity Catalog exposed to agents; its comment becomes the description and its parameters the schema."}
+  # ---- §6 Compaction
+  - {term: Compaction, section: d6, def: "Summarizing a long history with an LLM and continuing with system prompt + summary + recent items. Keeps facts while shrinking the window."}
+  - {term: Trimming heuristic, section: d6, def: "Hard-coded reduction such as a sliding window (keep last N turns). Cheap; fine only when relevance is recency-local."}
+  - {term: Recency-local relevance, section: d6, def: "Only recent turns matter (independent questions, alert streams). Trimming is sufficient."}
+  - {term: Recall-then-precision, section: d6, def: "Tune compaction prompts by first capturing everything needed downstream, then removing superfluous content while re-checking task success."}
+  - {term: Aggressive compaction, section: d6, def: "Early, frequent, short summaries: low cost, risk of losing subtle context that compounds over repeated compactions."}
+  - {term: Conservative compaction, section: d6, def: "Late, detailed summaries with a larger verbatim tail: high fidelity, higher cost."}
+  - {term: Compaction categories, section: d6, def: "What a summary should keep: goal, constraints/exclusions/preferences, decisions + reasons, progress, exact ids, failed approaches, open items, key facts."}
+  # ---- §7 Multi-agent
+  - {term: Implicit decisions, section: d7, def: "Every action embeds choices (style, definitions, assumptions). Sub-agents that can't see each other's decisions produce conflicting outputs."}
+  - {term: Trace summary at dispatch, section: d7, def: "A compressed summary of the coordinator's decisions and constraints attached to each sub-agent's task, sharing context without expanding their windows."}
+  - {term: Condensed return, section: d7, def: "A sub-agent's compact, structured result (~1–2k tokens) plus a handle to full outputs, instead of its transcript."}
+  - {term: Handoff compression overhead, section: d7, def: "Detail lost and tokens spent summarizing at every handoff. A sign that agent boundaries are too fine."}
+  - {term: Boundary too coarse, section: d7, def: "One agent owns too many loosely related subtasks, so its context grows without control."}
+  - {term: Single-threaded linear agent, section: d7, def: "One agent with continuous context (plus compaction): the simplest design that never loses decisions between agents."}
+  - {term: Structured note-taking, section: d7, def: "The agent keeps progress, todos and decisions in an external file or table and reloads them. Fits milestone-based or multi-session work."}
+  - {term: Supervisor Agent, section: d7, def: "Agent Bricks multi-agent orchestrator (formerly Multi-Agent Supervisor) routing to Genie, Knowledge Assistants, UC functions, MCP servers and agent endpoints."}

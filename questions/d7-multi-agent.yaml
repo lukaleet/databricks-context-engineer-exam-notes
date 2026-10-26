@@ -1,0 +1,312 @@
+section: d7
+questions:
+  - id: d7-01
+    objective: Diagnose root cause when sub-agents receive individual task messages rather than full agent traces, and resolve it without expanding sub-agent context windows
+    q: >-
+      A coordinator spends 25 turns agreeing with a user on a report's definitions, then dispatches three sub-agents with one-line task
+      messages. Their outputs use different definitions and formats. Which configuration fixes this without expanding each
+      sub-agent's context window?
+    options:
+      - 'Attach a compressed summary of the coordinator''s trace (decisions, definitions, constraints, format) to each dispatch message'
+      - 'Attach the full 25-turn transcript to each dispatch message'
+      - 'Give each sub-agent a bigger model'
+      - 'Let the sub-agents ask the user for the definitions again'
+    answer: [A]
+    explain: >-
+      Sub-agents lacked the coordinator's decisions. A compressed trace summary shares them in a few hundred tokens; the full
+      transcript would blow up every sub-agent's window.
+
+  - id: d7-02
+    objective: Diagnose root cause when sub-agents receive individual task messages rather than full agent traces, and resolve it without expanding sub-agent context windows
+    q: >-
+      Five forecasting sub-agents produce outputs that are consistent with each other but all use pre-update inventory figures. The
+      coordinator's log shows it has the updated figures. Each sub-agent's retrieved context cites the old figures from an AI Search
+      index; the source Delta table was updated an hour ago. What is the root cause?
+    options:
+      - 'The index was not synced after the update, so every sub-agent retrieves stale data'
+      - 'Sub-agents received task messages without the coordinator''s trace'
+      - 'The embedding model can''t represent numbers'
+      - 'The sub-agents need larger context windows'
+    answer: [A]
+    explain: >-
+      Mutually consistent but stale outputs point to a shared stale source. The evidence (retrieved context cites old values; table is
+      current) identifies the unsynced index.
+
+  - id: d7-03
+    objective: Diagnose multi-agent failure modes caused by insufficient shared context
+    q: >-
+      Two sub-agents build parts of a UI: one chooses a dark theme with rounded buttons, the other a light theme with square buttons.
+      Neither was told about the other's choices. What principle was violated?
+    options:
+      - 'Actions carry implicit decisions; sub-agents must share context about decisions, or conflicting decisions produce bad results'
+      - 'Sub-agents must always use the same model'
+      - 'Each sub-agent must have its own tools'
+      - 'Sub-agents should never run in parallel'
+    answer: [A]
+    explain: >-
+      Each sub-agent made implicit design decisions in isolation. Sharing context (or making dependent work sequential) prevents the
+      conflict.
+
+  - id: d7-04
+    objective: Given a multi-agent system producing conflicting outputs, identify the context propagation change most likely to prevent the conflict
+    q: >-
+      A planning sub-agent and a budgeting sub-agent run in parallel; the plan assumes a vendor the budget agent already rejected.
+      Which change most likely prevents this?
+    options:
+      - 'Run the dependent steps sequentially, passing the budget agent''s decisions to the planner (or share decisions via a common state store)'
+      - 'Add a third agent that averages both outputs'
+      - 'Increase both agents'' temperature'
+      - 'Give both agents more tools'
+    answer: [A]
+    explain: >-
+      The planner depends on the budget decision. Propagate that decision before (or while) planning; averaging conflicting outputs
+      doesn't resolve the conflict.
+
+  - id: d7-05
+    objective: Given an orchestrating agent experiencing context saturation, identify the sub-agent output design change that most reduces orchestrator load without compromising coherence
+    q: >-
+      An orchestrator receives each of six sub-agents' full transcripts (15–30k tokens each) and its quality drops. Which change best
+      reduces its context load without losing coherence?
+    options:
+      - 'Have sub-agents return condensed, structured results (findings, decisions, open issues) with references to full outputs stored elsewhere'
+      - 'Truncate each transcript to its first 2,000 characters'
+      - 'Drop the sub-agents'' outputs and let the orchestrator redo the work'
+      - 'Give the orchestrator a larger context window'
+    answer: [A]
+    explain: >-
+      Condensed structured returns carry what the orchestrator needs; handles keep the full data available. Truncation loses
+      information arbitrarily.
+
+  - id: d7-06
+    objective: Given an orchestrating agent experiencing context saturation, identify the sub-agent output design change that most reduces orchestrator load without compromising coherence
+    q: >-
+      Why do sub-agents that write large results to a Delta table and return a table name plus a summary help the orchestrator?
+    options:
+      - 'The orchestrator''s context holds only the summary and a handle, while the full data stays accessible if needed'
+      - 'Delta tables are automatically loaded into the context'
+      - 'It hides the results from the orchestrator'
+      - 'It makes sub-agents run in parallel'
+    answer: [A]
+    explain: >-
+      References instead of payloads keep the orchestrator's window small without losing data.
+
+  - id: d7-07
+    objective: Diagnose which boundary placement failure is occurring
+    q: >-
+      A workflow uses 14 agents, each handling one small step of a tightly coupled data-modeling task. Each handoff summarizes the
+      previous agent's work, and details are frequently lost. Which boundary failure is this?
+    options:
+      - 'Boundaries are too fine: excessive handoff compression overhead across tightly coupled steps'
+      - 'Boundaries are too coarse: one agent''s context grows without control'
+      - 'Boundaries are correct; the model is too small'
+      - 'Boundaries don''t matter in multi-agent systems'
+    answer: [A]
+    explain: >-
+      Tightly coupled work split into many agents forces lossy summaries at every hop. Merge coupled steps.
+
+  - id: d7-08
+    objective: Diagnose which boundary placement failure is occurring
+    q: >-
+      One agent handles intake, research across 20 sources, financial modeling and report writing. Its context repeatedly saturates and
+      it compacts every few steps. Which boundary failure is this and what's the fix?
+    options:
+      - 'Too coarse; split along loosely coupled parts (e.g. research per source in sub-agents, then modeling and writing)'
+      - 'Too fine; merge more steps into the agent'
+      - 'No failure; increase the compaction frequency'
+      - 'Too fine; add more handoffs'
+    answer: [A]
+    explain: >-
+      Unmanageable context growth inside one agent signals boundaries that are too coarse. Split where the interface is narrow.
+
+  - id: d7-09
+    objective: Identify which long-horizon strategy mismatch is causing a failure, select the replacement strategy, and justify it
+    q: >-
+      A team runs parallel sub-agents on a refactoring task where each step changes code that the next step builds on. Outputs
+      conflict and the build breaks. Which replacement strategy fits, and why?
+    options:
+      - 'A single agent working sequentially with compaction/notes, because the steps are tightly dependent and parallel sub-agents can''t see each other''s changes'
+      - 'More sub-agents, so each step is smaller'
+      - 'Sub-agents with larger windows'
+      - 'Keep the design and add a final merge agent'
+    answer: [A]
+    explain: >-
+      The dependency structure is sequential. Parallelism is the wrong fit; one thread of decisions avoids conflicts.
+
+  - id: d7-10
+    objective: Identify which long-horizon strategy mismatch is causing a failure, select the replacement strategy, and justify it
+    q: >-
+      An agent reconciles 3,000 payments over several runs using repeated compaction. After a few compactions it re-processes some
+      payments and skips others. Which replacement strategy fits, and what makes compaction insufficient?
+    options:
+      - 'Structured note-taking / a durable state table, because exact per-item status can''t survive repeated summarization'
+      - 'More aggressive compaction'
+      - 'Parallel sub-agents without shared state'
+      - 'A bigger context window'
+    answer: [A]
+    explain: >-
+      Summaries are lossy; exact progress over thousands of items needs an external state object.
+
+  - id: d7-11
+    objective: Identify which long-horizon strategy mismatch is causing a failure, select the replacement strategy, and justify it
+    q: >-
+      A single agent researches 40 independent companies one after another; its window saturates halfway and quality drops for the
+      later companies. Which strategy fits better?
+    options:
+      - 'Sub-agents per company (or batch) with condensed returns, because the subtasks are independent and parallelizable'
+      - 'A single agent with a sliding window'
+      - 'A single agent with extended thinking'
+      - 'One sub-agent per sentence of the final report'
+    answer: [A]
+    explain: >-
+      Independent breadth-first work is where sub-agent isolation helps most.
+
+  - id: d7-12
+    objective: Diagnose multi-agent failure modes caused by insufficient shared context
+    q: >-
+      Which symptom most directly indicates insufficient shared context between sub-agents (as opposed to a shared stale data source)?
+    options:
+      - 'Sub-agents'' outputs are inconsistent with each other (different assumptions, definitions or formats)'
+      - 'All sub-agents agree but the numbers are outdated'
+      - 'All sub-agents time out'
+      - 'The orchestrator responds slowly'
+    answer: [A]
+    explain: >-
+      Disagreement between sub-agents signals missing shared context. Consistent-but-wrong signals a common stale input.
+
+  - id: d7-13
+    objective: Diagnose root cause when sub-agents receive individual task messages rather than full agent traces, and resolve it without expanding sub-agent context windows
+    q: >-
+      Which TWO pieces of information should a compressed trace summary at dispatch include?
+    options:
+      - 'Decisions already made and their reasons (e.g. "active customer = order in last 90 days")'
+      - 'Constraints and conventions all sub-agents must follow (currency, format, exclusions)'
+      - 'The coordinator''s full raw tool outputs'
+      - 'Greetings exchanged with the user'
+      - 'Every intermediate draft the coordinator rejected'
+    answer: [A, B]
+    explain: >-
+      Shared decisions and constraints prevent conflicts. Raw outputs, chatter and drafts would expand the sub-agents' windows.
+
+  - id: d7-14
+    objective: Diagnose multi-agent failure modes caused by insufficient shared context
+    q: >-
+      A multi-agent system works on simple requests but fails unpredictably on complex ones, each handoff dropping some detail. Which
+      failure mode is this?
+    options:
+      - 'Degraded reliability from context lost at handoffs'
+      - 'Context poisoning in the orchestrator'
+      - 'Over-retrieval from long-term memory'
+      - 'A stale AI Search index'
+    answer: [A]
+    explain: >-
+      Complex tasks need more shared context; each lossy handoff compounds. Fewer handoffs and richer handoff summaries help.
+
+  - id: d7-15
+    objective: Identify which long-horizon strategy mismatch is causing a failure, select the replacement strategy, and justify it
+    q: >-
+      A human-in-the-loop approval workflow pauses for hours or days waiting for managers. After a redeploy, paused tasks are lost.
+      What should be added?
+    options:
+      - 'Checkpoint-and-resume with a durable checkpointer (e.g. LangGraph on Lakebase), keyed by thread'
+      - 'More aggressive compaction'
+      - 'Sub-agents for each manager'
+      - 'A sliding window'
+    answer: [A]
+    explain: >-
+      Long pauses and redeploys require persisted state that can be resumed.
+
+  - id: d7-16
+    objective: Given an orchestrating agent experiencing context saturation, identify the sub-agent output design change that most reduces orchestrator load without compromising coherence
+    q: >-
+      What return format should a research sub-agent use to keep the lead agent coherent and its context small?
+    options:
+      - 'A fixed schema: key findings with sources, decisions/assumptions made, confidence, open questions; roughly 1–2k tokens'
+      - 'Its full message history'
+      - 'Only "done"'
+      - 'All raw web pages it read'
+    answer: [A]
+    explain: >-
+      A condensed, structured summary carries what the lead needs to integrate results; "done" loses information and raw pages flood
+      the context.
+
+  - id: d7-17
+    objective: Diagnose which boundary placement failure is occurring
+    q: >-
+      What principle should guide where to draw agent boundaries?
+    options:
+      - 'Split where coupling is low and the interface between parts is narrow; keep tightly coupled steps in one agent'
+      - 'One agent per tool'
+      - 'One agent per team member'
+      - 'As many agents as possible to maximize parallelism'
+    answer: [A]
+    explain: >-
+      Boundaries along coupling minimize both handoff loss and per-agent context growth.
+
+  - id: d7-18
+    objective: Given a multi-agent system producing conflicting outputs, identify the context propagation change most likely to prevent the conflict
+    q: >-
+      Three sub-agents write sections of one document and each invents its own terminology for the same concepts. What propagation
+      change most likely prevents this?
+    options:
+      - 'Give all sub-agents a shared glossary/style brief at dispatch (part of the trace summary)'
+      - 'Let a final agent rewrite everything'
+      - 'Increase each sub-agent''s top-k'
+      - 'Run all sub-agents with temperature 0'
+    answer: [A]
+    explain: >-
+      Shared conventions at dispatch prevent the divergence instead of repairing it afterwards.
+
+  - id: d7-19
+    objective: Identify which long-horizon strategy mismatch is causing a failure, select the replacement strategy, and justify it
+    q: >-
+      For a long, conversational debugging session with a user (many back-and-forth turns, each building on the last), which
+      long-horizon strategy fits best?
+    options:
+      - 'A single agent with compaction, because conversational continuity in one thread matters most'
+      - 'Parallel sub-agents per hypothesis without shared context'
+      - 'A sliding window of the last 5 turns'
+      - 'A new session every 10 turns'
+    answer: [A]
+    explain: >-
+      Compaction suits extensive back-and-forth where the thread of conversation must be kept.
+
+  - id: d7-20
+    objective: Diagnose root cause when sub-agents receive individual task messages rather than full agent traces, and resolve it without expanding sub-agent context windows
+    q: >-
+      Why is passing the coordinator's full raw trace to each sub-agent usually the wrong fix for missing shared context?
+    options:
+      - 'It expands every sub-agent''s context window with mostly irrelevant tokens, causing cost and distraction'
+      - 'Sub-agents can''t read traces'
+      - 'Traces are not allowed in MLflow'
+      - 'It has no effect on the outputs'
+    answer: [A]
+    explain: >-
+      The goal is shared decisions, not the whole history. A compressed summary gives the benefit without the cost.
+
+  - id: d7-21
+    objective: Diagnose multi-agent failure modes caused by insufficient shared context
+    q: >-
+      In a Databricks multi-agent system, how can an engineer verify what context each sub-agent actually received at dispatch?
+    options:
+      - 'Inspect the MLflow trace: each sub-agent''s span shows its inputs, tool calls and outputs'
+      - 'Ask the orchestrator to describe what it sent'
+      - 'Check the Unity Catalog lineage graph'
+      - 'Read the system prompt of the orchestrator'
+    answer: [A]
+    explain: >-
+      Tracing records the actual inputs and outputs of every span, including sub-agent calls.
+
+  - id: d7-22
+    objective: Given an orchestrating agent experiencing context saturation, identify the sub-agent output design change that most reduces orchestrator load without compromising coherence
+    q: >-
+      An orchestrator saturates because sub-agents return verbose prose of varying structure, and it must re-read everything to merge
+      results. Which TWO changes help most?
+    options:
+      - 'Define a compact output schema every sub-agent must follow'
+      - 'Store full results externally and return references'
+      - 'Ask sub-agents to include all intermediate reasoning'
+      - 'Remove the orchestrator''s system prompt'
+      - 'Increase the number of sub-agents'
+    answer: [A, B]
+    explain: >-
+      A fixed compact schema and references instead of payloads cut orchestrator load while keeping what it needs.

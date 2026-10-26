@@ -1,0 +1,312 @@
+section: d5
+questions:
+  - id: d5-01
+    objective: Apply a progressive-disclosure approach to MCP tool access to reduce token usage compared to raw tool dumps
+    q: >-
+      An agent connects to an MCP server with 70 tools and loads every schema on every turn. Token usage is high and tool selection is
+      inconsistent. Which approach applies progressive disclosure?
+    options:
+      - 'Expose a compact tool catalog, let a discovery step match the user''s intent, then load only the selected tool''s full schema'
+      - 'Load all 70 schemas but compress their descriptions to one word each'
+      - 'Load all 70 schemas, then have a classifier pick the best one after they are in context'
+      - 'Split the 70 tools randomly across two agents'
+    answer: [A]
+    explain: >-
+      Progressive disclosure stages what enters the context: catalog → discovery → one schema → scoped result. Ranking after loading
+      everything has already spent the tokens; one-word descriptions make selection worse.
+
+  - id: d5-02
+    objective: Explain how progressive disclosure controls how much tool information enters the context window at each stage
+    q: >-
+      Why does staged tool discovery use fewer tokens than loading full tool schemas up front?
+    options:
+      - 'Only lightweight names/descriptors are always present; full schemas enter the context only for the tools actually selected'
+      - 'MCP compresses schemas automatically'
+      - 'Schemas loaded later are not counted as tokens'
+      - 'The model caches schemas between users'
+    answer: [A]
+    explain: >-
+      Unused tools never contribute their schemas. The always-present catalog is a small fraction of the full dump.
+
+  - id: d5-03
+    objective: Apply a progressive-disclosure approach to MCP tool access to reduce token usage compared to raw tool dumps
+    q: >-
+      With progressive disclosure, four near-duplicate tools (`fetch_invoice`, `get_invoice`, `invoice_lookup`, `retrieve_bill`) are
+      all surfaced at discovery for every billing question, and selection is inconsistent. What should the engineer do?
+    options:
+      - 'Enrich each tool''s registry metadata with distinct capability descriptors and have discovery score against the intent, surfacing only the best match'
+      - 'Surface all four schemas and add a prompt rule "prefer get_invoice"'
+      - 'Load all four schemas and rank them with a classifier after they are in context'
+      - 'Cluster the four tools by embedding distance and surface the centroid'
+    answer: [A]
+    explain: >-
+      Distinct descriptors let the discovery stage discriminate, and only one schema enters the context. Ranking after loading wastes
+      tokens; a centroid isn't a real tool.
+
+  - id: d5-04
+    objective: Given two MCP tool descriptions an agent is consistently confusing, identify the overlap causing ambiguous tool selection
+    q: >-
+      Tool A: "Gets customer information." Tool B: "Retrieves information about a customer." A returns contact details; B returns
+      purchase history. The agent picks randomly. What causes the ambiguity?
+    options:
+      - 'Both descriptions use the same verb and object and neither states what it returns or when to use it'
+      - 'The tools have different names'
+      - 'The descriptions are too short to be loaded'
+      - 'The model has too few tools'
+    answer: [A]
+    explain: >-
+      The descriptions are semantically identical. Rewrite them to state the distinct outputs and when to use each.
+
+  - id: d5-05
+    objective: Given two MCP tool descriptions an agent is consistently confusing, identify the overlap causing ambiguous tool selection
+    q: >-
+      Which rewrite best resolves confusion between `search_orders` and `list_orders`?
+    options:
+      - '"search_orders: find orders by free-text (product, customer name) across all time. list_orders: list ONE customer''s orders by customer_id, newest first, max 20."'
+      - '"search_orders: searches orders. list_orders: lists orders."'
+      - '"search_orders: the best tool for orders. list_orders: also for orders."'
+      - 'Rename both to `orders_tool_1` and `orders_tool_2`'
+    answer: [A]
+    explain: >-
+      Distinct descriptions state the input, the scope and the output so the model (and a human) can tell them apart.
+
+  - id: d5-06
+    objective: Given an agent with a deep message history approaching capacity, evaluate which raw tool outputs are candidates for clearing
+    q: >-
+      An agent is at 85% of its window. Which tool output is the best candidate for clearing?
+    options:
+      - 'A 7,000-token search result from 25 turns ago whose findings the agent already summarized, and which can be re-run'
+      - 'The confirmation with the new ticket id returned by `create_ticket` three turns ago'
+      - 'The result of the tool call the agent is currently reasoning about'
+      - 'A user-uploaded document the agent is still answering questions about'
+    answer: [A]
+    explain: >-
+      Old, digested, re-fetchable raw output is the safest to clear. Write confirmations, current results and user material are still
+      needed and may not be reproducible.
+
+  - id: d5-07
+    objective: Given an agent with a deep message history approaching capacity, evaluate which raw tool outputs are candidates for clearing
+    q: >-
+      Why should a cleared tool result leave a short stub (e.g. "[cleared: orders_search(...) - findings in turn 12]") instead of
+      deleting the whole call?
+    options:
+      - 'So the model still knows the call happened and where its conclusions are, without paying for the raw payload'
+      - 'Because MCP requires every call to keep its full result'
+      - 'Because stubs are free and don''t count as tokens'
+      - 'So the call is automatically re-executed next turn'
+    answer: [A]
+    explain: >-
+      The stub preserves the trajectory (avoiding repeated calls) at a tiny token cost. Many APIs also require tool calls and results
+      to stay paired.
+
+  - id: d5-08
+    objective: Identify the most appropriate tool and justify the selection based on functional fit, input/output compatibility, and task requirements
+    q: >-
+      Task: "Is order ORD-5512 delayed?" Available UC functions: (1) `orders_search(customer STRING, start DATE, end DATE)` returns a
+      list of orders; (2) `orders_get_status(order_id STRING)` returns status and ETA; (3) `orders_update_status(order_id STRING,
+      status STRING)`; (4) `shipping_carrier_info(carrier STRING)`. Which tool fits and why?
+    options:
+      - '`orders_get_status`: it does exactly this read, takes the order id the agent already has, and returns the status and ETA needed'
+      - '`orders_search`: it returns more information'
+      - '`orders_update_status`: it can set the status to delayed'
+      - '`shipping_carrier_info`: delays are caused by carriers'
+    answer: [A]
+    explain: >-
+      Functional fit (a read of one order's status), input compatibility (order id available) and output compatibility (status + ETA).
+      Search needs inputs the agent lacks and returns a list; update is a write.
+
+  - id: d5-09
+    objective: Identify the most appropriate tool and justify the selection based on functional fit, input/output compatibility, and task requirements
+    q: >-
+      An agent has a customer's email address and must fetch their loyalty tier. Tool A takes `customer_id INT`; tool B takes
+      `email STRING` and returns `customer_id`; tool C takes `customer_id INT` and returns the tier. What's the right plan?
+    options:
+      - 'Call B to get the customer_id from the email, then C to get the tier'
+      - 'Call C with the email address'
+      - 'Call A with the email address cast to INT'
+      - 'Ask the LLM to guess the tier'
+    answer: [A]
+    explain: >-
+      Input/output compatibility: chain the tool that produces the required input into the tool that returns the needed output.
+
+  - id: d5-10
+    objective: Identify capabilities to package as Agent Skills and select the loading strategy that minimizes baseline context cost without harming task success
+    q: >-
+      A system prompt is 9,000 tokens; 6,500 of them describe four rarely used procedures (annual audit export, GDPR erasure, bulk
+      price update, contract redlining), each used in under 2% of conversations. What should the engineer do?
+    options:
+      - 'Package each procedure as an Agent Skill with a clear name/description in the baseline context and the body loaded on demand'
+      - 'Delete the four procedures from the agent'
+      - 'Keep them in the system prompt but move them to the end'
+      - 'Load all four skill bodies at the start of every conversation'
+    answer: [A]
+    explain: >-
+      Metadata-only baseline with on-demand bodies minimizes cost and keeps the capabilities. Deleting them harms task success;
+      loading all bodies up front recreates the original cost.
+
+  - id: d5-11
+    objective: Identify capabilities to package as Agent Skills and select the loading strategy that minimizes baseline context cost without harming task success
+    q: >-
+      Which instruction should stay in the system prompt rather than move into an Agent Skill?
+    options:
+      - '"Never reveal another customer''s data" (applies to every turn)'
+      - 'A 1,500-token procedure for generating the quarterly regulator XML file'
+      - 'A reference table of 300 product codes used for bulk updates'
+      - 'A step-by-step guide for redlining contracts'
+    answer: [A]
+    explain: >-
+      Always-relevant rules (safety, identity, core task) belong in the baseline. Rare, long, self-contained procedures are skill
+      candidates.
+
+  - id: d5-12
+    objective: Identify capabilities to package as Agent Skills and select the loading strategy that minimizes baseline context cost without harming task success
+    q: >-
+      After moving procedures into skills, the agent sometimes fails to use the GDPR skill when a user asks to "erase my account". What
+      is the most likely cause?
+    options:
+      - 'The skill''s description is vague, so the model doesn''t recognize it as relevant; make it specific about when to use it'
+      - 'Skills can''t contain more than 100 tokens'
+      - 'The skill body must be loaded in the system prompt'
+      - 'GDPR requests can''t be handled by agents'
+    answer: [A]
+    explain: >-
+      On-demand loading depends on the always-present description. A precise "use when…" description triggers it reliably.
+
+  - id: d5-13
+    objective: Apply a progressive-disclosure approach to MCP tool access to reduce token usage compared to raw tool dumps
+    q: >-
+      A tool returns a 10,000-row spreadsheet, but the agent only needs the rows where status is "overdue" (about 12). What is the
+      context-efficient approach?
+    options:
+      - 'Filter the data in the execution environment (or in the tool) and return only the overdue rows to the model'
+      - 'Return all rows and ask the model to filter them'
+      - 'Return the first 100 rows'
+      - 'Return all rows and clear them next turn'
+    answer: [A]
+    explain: >-
+      Context-efficient execution processes large results before they reach the model. Returning everything, or an arbitrary slice,
+      wastes tokens or loses data.
+
+  - id: d5-14
+    objective: Explain how progressive disclosure controls how much tool information enters the context window at each stage
+    q: >-
+      Which sequence describes progressive disclosure of MCP tools?
+    options:
+      - 'Catalog of tool names/descriptors → discovery against intent → full schema of the chosen tool → execution with a scoped result'
+      - 'Full schemas → execution → catalog'
+      - 'Execution → full schemas → discovery'
+      - 'Catalog → load every schema → pick one'
+    answer: [A]
+    explain: >-
+      Each stage loads only as much as needed for the next decision.
+
+  - id: d5-15
+    objective: Given two MCP tool descriptions an agent is consistently confusing, identify the overlap causing ambiguous tool selection
+    q: >-
+      Two tools: `kb_search` "Search the knowledge base for answers" and `docs_search` "Search documentation to find answers". The
+      first covers HR policies, the second product manuals. What is the best fix?
+    options:
+      - 'State the domain in each description (HR policies vs product manuals) and when not to use each, or merge them behind one tool with a `domain` parameter'
+      - 'Add a system prompt rule to alternate between them'
+      - 'Increase the number of results each returns'
+      - 'Remove the descriptions and rely on the names'
+    answer: [A]
+    explain: >-
+      The overlap is in purpose and wording; making the scope explicit (or merging with a parameter) removes the ambiguity.
+
+  - id: d5-16
+    objective: Given an agent with a deep message history approaching capacity, evaluate which raw tool outputs are candidates for clearing
+    q: >-
+      Which TWO tool outputs should be kept when clearing tool results in a deep history?
+    options:
+      - 'The order id returned by `create_replacement_order` (cannot be re-fetched without the id)'
+      - 'The tracking result that the next planned step depends on'
+      - 'A web search from 30 turns ago that was summarized and superseded'
+      - 'A failed, empty query whose lesson was recorded'
+      - 'A duplicate call to the same API with the same parameters'
+    answer: [A, B]
+    explain: >-
+      Keep irreproducible results (ids from writes) and results pending steps depend on. Old digested, failed or duplicate outputs are
+      candidates for clearing.
+
+  - id: d5-17
+    objective: Identify the most appropriate tool and justify the selection based on functional fit, input/output compatibility, and task requirements
+    q: >-
+      A UC function used as an agent tool has the comment "Helper function v2". Agents rarely call it, even when it's the right tool.
+      What is the fix?
+    options:
+      - 'Rewrite the function comment, which becomes the tool description, to say what it does, its inputs, outputs and when to use it'
+      - 'Rename the catalog'
+      - 'Grant the agent ALL PRIVILEGES'
+      - 'Call the function from the system prompt'
+    answer: [A]
+    explain: >-
+      For UC functions exposed as tools, the comment is the description the model uses to choose tools.
+
+  - id: d5-18
+    objective: Apply a progressive-disclosure approach to MCP tool access to reduce token usage compared to raw tool dumps
+    q: >-
+      A team compares (A) a raw dump of 60 tool schemas, about 8,000 tokens per call, with (B) a 300-token catalog plus one loaded
+      schema of about 150 tokens per call. Besides cost, what other benefit does B usually bring?
+    options:
+      - 'More consistent tool selection, because fewer similar tools compete for attention'
+      - 'Tools run faster on the server'
+      - 'It removes the need for tool descriptions'
+      - 'It allows tools without parameters'
+    answer: [A]
+    explain: >-
+      Fewer candidate tools in context reduces confusion, so selection improves along with cost.
+
+  - id: d5-19
+    objective: Identify the most appropriate tool and justify the selection based on functional fit, input/output compatibility, and task requirements
+    q: >-
+      For the task "show me last month's revenue by region", which tool is the best fit?
+    options:
+      - 'A Genie space (or a UC function with month and region parameters) over the governed revenue tables'
+      - 'An AI Search retriever over PDF reports'
+      - 'A long-term memory search'
+      - 'An external web-search MCP server'
+    answer: [A]
+    explain: >-
+      Aggregations over structured, governed data fit text-to-SQL or a parameterized function. Document retrieval or memory would be
+      approximate or stale.
+
+  - id: d5-20
+    objective: Identify capabilities to package as Agent Skills and select the loading strategy that minimizes baseline context cost without harming task success
+    q: >-
+      Which describes the loading levels of an Agent Skill?
+    options:
+      - 'Name and description always loaded; SKILL.md body loaded when relevant; linked files loaded only when needed'
+      - 'Everything loaded at startup'
+      - 'Only linked files are ever loaded'
+      - 'The body is always loaded and the description on demand'
+    answer: [A]
+    explain: >-
+      Three levels of progressive disclosure keep the baseline small while the total available content is large.
+
+  - id: d5-21
+    objective: Given an agent with a deep message history approaching capacity, evaluate which raw tool outputs are candidates for clearing
+    q: >-
+      What is the main advantage of tool result clearing over full compaction when the window is filling up?
+    options:
+      - 'It is the lightest intervention: it removes bulky raw outputs while leaving the conversation and decisions untouched'
+      - 'It summarizes the user''s constraints'
+      - 'It removes the system prompt'
+      - 'It makes the context window larger'
+    answer: [A]
+    explain: >-
+      Clearing only touches re-fetchable raw outputs, so it carries little risk of losing context.
+
+  - id: d5-22
+    objective: Apply a progressive-disclosure approach to MCP tool access to reduce token usage compared to raw tool dumps
+    q: >-
+      A `search_tools(query, detail_level)` tool lets the agent request tool information at the levels "name", "name+description" or
+      "full schema". How should the agent use it to stay context-efficient?
+    options:
+      - 'Search at "name" or "name+description" level first, then request the full schema only for the tool it decides to call'
+      - 'Always request full schemas for every match'
+      - 'Request full schemas for all tools at the start'
+      - 'Never request a schema; call tools by guessing parameters'
+    answer: [A]
+    explain: >-
+      Detail levels exist so the agent loads the minimum information needed at each decision point.

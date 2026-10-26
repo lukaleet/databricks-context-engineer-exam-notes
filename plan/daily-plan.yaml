@@ -1,0 +1,103 @@
+# 14-day sprint after the GenAI exam (Nov 7 -> exam Nov 20), ~90-120 min/day.
+# Set the plan start date to Nov 7 on the Daily plan page so "Today" lines up.
+# Each task: text + optional link (site hash route or lab file).
+weeks:
+  - title: "Days 1-3: Orient and foundations (§1 = 16%)"
+    days:
+      - day: 1
+        title: Orient (light day after the GenAI exam)
+        tasks:
+          - {text: "Read the GenAI → Context Engineer bridge (what carries over, which names change)", link: "#/notes/bridge"}
+          - {text: "Read Exam overview & traps, especially the lessons from the official sample questions", link: "#/notes/overview"}
+          - {text: "Diagnostic: a 10-question practice quiz, all sections mixed (no notes)", link: "#/practice"}
+          - {text: "Write down your 2-3 weakest sections"}
+      - day: 2
+        title: Context, attention budget, failure modes
+        tasks:
+          - {text: "Notes §1, sections 1.1-1.5", link: "#/notes/d1"}
+          - {text: "Lab 00 (setup, token counting), then Lab 01 Step 1 (diagnose four traces)", link: "lab:00_setup.py"}
+          - {text: "Visual guide §1: context anatomy, failure modes, proactive vs reactive", link: "#/notes/visual"}
+          - {text: "Practice §1 (10 questions)", link: "#/practice?s=d1&go=1"}
+      - day: 3
+        title: Product stack, attention hogs, reasoning modes, degradation
+        tasks:
+          - {text: "Notes §1, sections 1.6-1.9", link: "#/notes/d1"}
+          - {text: "Lab 01 Steps 2-3 (needle test, thinking budgets)", link: "lab:01_failure_modes_degradation.py"}
+          - {text: "Practice §1 again until ≥ 80%", link: "#/practice?s=d1&go=1"}
+          - {text: "Flashcards: 10 min", link: "#/flashcards"}
+  - title: "Days 4-8: The new material (§4 memory, §6 compaction, §5 tools, §7 multi-agent)"
+    days:
+      - day: 4
+        title: Memory layers and Lakebase
+        tasks:
+          - {text: "Notes §4, sections 4.1-4.5 (memory layers, mismatches, state objects, Lakebase + LangGraph code)", link: "#/notes/d4"}
+          - {text: "Lab 04 Steps 1-2 (checkpointer by thread_id, long-term store by user)", link: "lab:04_memory_lakebase.py"}
+          - {text: "Memorize the async setup: AsyncPostgresSaver(pool) → await setup() → compile(checkpointer=…)"}
+      - day: 5
+        title: Memory retrieval, over/under-retrieval, intent, MLflow comparison
+        tasks:
+          - {text: "Notes §4, sections 4.6-4.10", link: "#/notes/d4"}
+          - {text: "Lab 04 Steps 3-6 (router, k/threshold, intent first, state table)", link: "lab:04_memory_lakebase.py"}
+          - {text: "Practice §4 (10 questions)", link: "#/practice?s=d4&go=1"}
+          - {text: "Scenario: The Forgetful Support Agent", link: "#/scenarios/s1"}
+      - day: 6
+        title: Compaction
+        tasks:
+          - {text: "Notes §6 (ladder, trimming vs compaction, what to keep, recall then precision)", link: "#/notes/d6"}
+          - {text: "Lab 06 (sliding window vs three compaction prompts)", link: "lab:06_compaction.py"}
+          - {text: "Practice §6 (10 questions)", link: "#/practice?s=d6&go=1"}
+          - {text: "Scenario: The Long-Running Research Agent", link: "#/scenarios/s2"}
+      - day: 7
+        title: Tools, MCP, progressive disclosure, skills
+        tasks:
+          - {text: "Notes §5", link: "#/notes/d5"}
+          - {text: "Lab 05 (60-tool dump vs staged discovery, ambiguous tools, clearing, skills)", link: "lab:05_tools_progressive_disclosure.py"}
+          - {text: "Practice §5 (10 questions)", link: "#/practice?s=d5&go=1"}
+          - {text: "Scenario: The 60-Tool MCP Server", link: "#/scenarios/s4"}
+      - day: 8
+        title: Multi-agent and long-horizon
+        tasks:
+          - {text: "Notes §7", link: "#/notes/d7"}
+          - {text: "Lab 07 (dispatch with trace summary, condensed returns, boundaries, strategy fit)", link: "lab:07_multi_agent_context.py"}
+          - {text: "Practice §7 (10 questions)", link: "#/practice?s=d7&go=1"}
+          - {text: "Scenario: The Regional Churn Report", link: "#/scenarios/s5"}
+  - title: "Days 9-10: Review what you know (§2, §3) and get hands-on"
+    days:
+      - day: 9
+        title: Instructions, Genie, retrieval (mostly review from GenAI)
+        tasks:
+          - {text: "Notes §2 (focus: 2.4 Genie knowledge store, 2.5 ablation)", link: "#/notes/d2"}
+          - {text: "Notes §3 (focus: 3.3 UC metadata, 3.8-3.9 authoritative sources; skim chunking and AI Search)", link: "#/notes/d3"}
+          - {text: "Labs 02 and 03", link: "lab:02_prompt_ablation_fewshot.py"}
+          - {text: "Practice §2 and §3 (10 each)", link: "#/practice?s=d3&go=1"}
+      - day: 10
+        title: Hands-on in Databricks + scenarios
+        tasks:
+          - {text: "In a Genie space: add a column synonym, an SQL expression (measure), a general instruction, a benchmark. Note which fixes which question"}
+          - {text: "Run labs 02, 04 and 06 on Databricks with a real model (Lab 04 with a Lakebase instance if you can)", link: "lab:04_memory_lakebase.py"}
+          - {text: "Scenario: The Treasury Genie Space", link: "#/scenarios/s3"}
+          - {text: "Scenario: The Policy Agent and the Sandbox Copy", link: "#/scenarios/s6"}
+  - title: "Days 11-14: Simulate and sharpen"
+    days:
+      - day: 11
+        title: Mock exam 1
+        tasks:
+          - {text: "Timed mock exam (45 questions / 90 min)", link: "#/mock"}
+          - {text: "Review every miss in Review mistakes and re-read the matching notes", link: "#/review"}
+      - day: 12
+        title: Mock exam 2 + weak sections
+        tasks:
+          - {text: "Second timed mock exam", link: "#/mock"}
+          - {text: "Re-read the notes for your two weakest sections"}
+          - {text: "Symptom → fix cheat sheet, end to end", link: "#/notes/cheatsheet"}
+      - day: 13
+        title: Light review, early night
+        tasks:
+          - {text: "Review mistakes until the list is empty", link: "#/review"}
+          - {text: "Flashcards: 15 min", link: "#/flashcards"}
+          - {text: "Visual guide: skim all diagrams once", link: "#/notes/visual"}
+      - day: 14
+        title: Exam day (November 20)
+        tasks:
+          - {text: "15 min: Symptom → fix cheat sheet only", link: "#/notes/cheatsheet"}
+          - {text: "In the exam: read the constraint at the end of each question first, find the evidence, pick the most direct fix"}
